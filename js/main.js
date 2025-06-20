@@ -110,7 +110,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 profilePicEl.src = profile.pic;
             }
         } catch (error) {
-            console.error('Failed to load profile picture:', error);
+            console.error('Failed to load profile picture due to a database error:', error);
         }
     }
 
@@ -601,23 +601,28 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!newsContainer) return;
 
         const rssUrl = 'https://www.who.int/rss-feeds/news-english.xml';
-        const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(rssUrl)}`;
+        const apiUrl = `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(rssUrl)}`;
         
         try {
-            const response = await fetch(proxyUrl);
-            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+            const response = await fetch(apiUrl);
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
             
             const data = await response.json();
-            const str = data.contents;
-            const xml = new window.DOMParser().parseFromString(str, "text/xml");
-            const items = xml.querySelectorAll("item");
+
+            if (data.status !== 'ok') {
+                throw new Error('RSS feed could not be loaded.');
+            }
             
+            const items = data.items;
             let html = ``;
+
             items.forEach((el, index) => {
                 if (index >= 5) return; // Limit to 5 news items
-                const title = el.querySelector("title")?.textContent || 'No title';
-                const link = el.querySelector("link")?.textContent || '#';
-                const pubDate = new Date(el.querySelector("pubDate")?.textContent).toLocaleDateString('th-TH');
+                const title = el.title || 'No title';
+                const link = el.link || '#';
+                const pubDate = new Date(el.pubDate).toLocaleDateString('th-TH');
                 
                 html += `
                     <div class="news-item">
@@ -635,9 +640,9 @@ document.addEventListener('DOMContentLoaded', () => {
             newsContainer.innerHTML = html;
 
         } catch (error) {
-            console.error("Error fetching WHO news feed:", error);
+            console.error("Error fetching or parsing news feed:", error);
             if (newsContainer) {
-                newsContainer.innerHTML = `<p>ขออภัย, ไม่สามารถโหลดข่าวสารได้ในขณะนี้ (อาจเกิดจากปัญหา CORS Proxy) ลองรีเฟรชหน้าเว็บอีกครั้ง</p>`;
+                newsContainer.innerHTML = `<p>ขออภัย, ไม่สามารถโหลดข่าวสารได้ในขณะนี้ กรุณาลองใหม่ในภายหลัง</p>`;
             }
         }
     }
@@ -676,13 +681,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const store = transaction.objectStore(storeName);
         const request = store.get(key);
         return new Promise((resolve, reject) => {
-            request.onerror = () => reject('Error getting data');
+            request.onerror = () => reject('Error getting data from ' + storeName);
             request.onsuccess = () => {
-                if (request.result) {
-                    resolve(request.result);
-                } else {
-                    reject('Data not found');
-                }
+                resolve(request.result || null);
             };
         });
     }

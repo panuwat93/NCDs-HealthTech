@@ -1,4 +1,4 @@
-const CACHE_NAME = 'ncds-healthtech-cache-v2';
+const CACHE_NAME = 'ncds-healthtech-cache-v3';
 const URLS_TO_CACHE = [
     './',
     'index.html',
@@ -14,7 +14,7 @@ const URLS_TO_CACHE = [
     'js/emergencyData.js',
     'images/icons/icon-192x192.png',
     'images/icons/icon-512x512.png',
-    'https://www.smpkh.go.th/images/logo_smpk.png',
+    'images/default-profile.png',
     'https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap',
     'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css',
     'https://cdn.jsdelivr.net/npm/chart.js'
