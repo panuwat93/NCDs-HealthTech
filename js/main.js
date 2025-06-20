@@ -620,18 +620,19 @@ document.addEventListener('DOMContentLoaded', () => {
         const newsContainer = document.getElementById('news-feed-container');
         if (!newsContainer) return;
 
-        // Using a CORS proxy to fetch the WHO RSS feed
-        const proxyUrl = 'https://cors-anywhere.herokuapp.com/';
+        // Switched to a more reliable proxy
         const rssUrl = 'https://www.who.int/rss-feeds/news-english.xml';
+        const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(rssUrl)}`;
         
         try {
-            const response = await fetch(proxyUrl + rssUrl);
+            const response = await fetch(proxyUrl);
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
-            const str = await response.text();
-            const data = new window.DOMParser().parseFromString(str, "text/xml");
-            const items = data.querySelectorAll("item");
+            const data = await response.json();
+            const str = data.contents; // allorigins wraps the response in a 'contents' property
+            const xml = new window.DOMParser().parseFromString(str, "text/xml");
+            const items = xml.querySelectorAll("item");
             
             let html = ``;
             items.forEach((el, index) => {
