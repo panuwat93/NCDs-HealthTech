@@ -556,37 +556,63 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- Emergency Page ---
     function renderEmergencyPage() {
-        const contactsHtml = emergencyContacts.map(contact => `
+        const listHtml = emergencyData.map(contact => `
             <div class="emergency-card">
                 <i class="${contact.icon}"></i>
                 <div class="contact-info">
                     <span class="contact-name">${contact.name}</span>
-                    <a href="tel:${contact.number}" class="contact-number">${contact.number}</a>
+                    <a href="tel:${contact.phone}" class="contact-number">${contact.phone}</a>
                 </div>
-            </div>`).join('');
+            </div>
+        `).join('');
         return `
             <div class="page-header">
                 <h2><i class="fas fa-phone-volume"></i> เบอร์โทรฉุกเฉิน</h2>
-                <p>รวมเบอร์โทรศัพท์ที่สำคัญสำหรับเหตุฉุกเฉิน</p>
+                <p>เบอร์โทรศัพท์ที่สำคัญสำหรับเหตุการณ์ฉุกเฉิน</p>
             </div>
-            <div class="emergency-list">${contactsHtml}</div>`;
+            <div class="emergency-list">${listHtml}</div>`;
     }
 
     async function fetchNCDsNews() {
-        const newsContainer = document.getElementById('news-feed-container');
-        if (!newsContainer) return;
+    const newsContainer = document.getElementById('news-feed-container');
+    if (!newsContainer) return;
 
-        newsContainer.innerHTML = `<p class="loading-news">กำลังโหลดข่าวสารล่าสุด...</p>`;
+    newsContainer.innerHTML = `<p class="loading-news">กำลังโหลดข่าวสารล่าสุด...</p>`;
 
-        // Switched to a more reliable, open source (WHO RSS Feed) via a proxy to avoid CORS issues on deployment
-        const RSS_URL = 'https://www.who.int/rss-feeds/news-rss.xml';
-        const API_URL = `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(RSS_URL)}`;
+    // Switched to a more reliable, open source (WHO RSS Feed) via a proxy to avoid CORS issues on deployment
+    const RSS_URL = 'https://www.who.int/rss-feeds/news-rss.xml';
+    const API_URL = `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(RSS_URL)}`;
 
-        try {
-            const response = await fetch(API_URL);
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
+    try {
+        const response = await fetch(API_URL);
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const data = await response.json();
+
+        if (data && data.status === 'ok' && data.items) {
+            const articles = data.items.slice(0, 5); // Get latest 5 articles
+            let articlesHtml = articles.map(article => {
+                const description = (article.description || '').replace(/<[^>]*>/g, "").substring(0, 150);
+                return `
+                <div class="news-article">
+                    <h4><a href="${article.link}" target="_blank" rel="noopener noreferrer">${article.title}</a></h4>
+                    <p class="news-description">${description}...</p>
+                    <div class="news-footer">
+                        <span>${new Date(article.pubDate).toLocaleDateString('th-TH', { day: 'numeric', month: 'long', year: 'numeric' })}</span>
+                        <a href="${article.link}" target="_blank" rel="noopener noreferrer" class="read-more">อ่านต่อ <i class="fas fa-arrow-right"></i></a>
+                    </div>
+                </div>
+            `}).join('');
+            newsContainer.innerHTML = articlesHtml;
+        } else {
+            newsContainer.innerHTML = `<p>ไม่พบข่าวสารในขณะนี้</p>`;
+        }
+    } catch (error) {
+        console.error("Could not fetch news:", error);
+        newsContainer.innerHTML = `<p>ขออภัย, ไม่สามารถโหลดข่าวสารได้ในขณะนี้ กรุณาลองใหม่อีกครั้ง</p>`;
+    }
+}
             const data = await response.json();
 
             if (data && data.status === 'ok' && data.items) {
