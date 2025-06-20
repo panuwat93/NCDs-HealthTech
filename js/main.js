@@ -611,49 +611,56 @@ document.addEventListener('DOMContentLoaded', () => {
             <div class="emergency-list">${listHtml}</div>`;
     }
 
+    function addHomePageEventListeners() {
+        fetchNCDsNews();
+    }
+
+    // --- News Feed ---
     async function fetchNCDsNews() {
         const newsContainer = document.getElementById('news-feed-container');
         if (!newsContainer) return;
 
-        newsContainer.innerHTML = `<p class="loading-news">กำลังโหลดข่าวสารล่าสุด...</p>`;
-
-        // Switched to a more reliable, open source (WHO RSS Feed) via a proxy to avoid CORS issues on deployment
-        const RSS_URL = 'https://www.who.int/rss-feeds/news-rss.xml';
-        const API_URL = `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(RSS_URL)}`;
-
+        // Using a CORS proxy to fetch the WHO RSS feed
+        const proxyUrl = 'https://cors-anywhere.herokuapp.com/';
+        const rssUrl = 'https://www.who.int/rss-feeds/news-english.xml';
+        
         try {
-            const response = await fetch(API_URL);
+            const response = await fetch(proxyUrl + rssUrl);
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
-            const data = await response.json();
-
-            if (data && data.status === 'ok' && data.items) {
-                const articles = data.items.slice(0, 5); // Get latest 5 articles
-                let articlesHtml = articles.map(article => {
-                    const description = (article.description || '').replace(/<[^>]*>/g, "").substring(0, 150);
-                    return `
-                    <div class="news-article">
-                        <h4><a href="${article.link}" target="_blank" rel="noopener noreferrer">${article.title}</a></h4>
-                        <p class="news-description">${description}...</p>
-                        <div class="news-footer">
-                            <span>${new Date(article.pubDate).toLocaleDateString('th-TH', { day: 'numeric', month: 'long', year: 'numeric' })}</span>
-                            <a href="${article.link}" target="_blank" rel="noopener noreferrer" class="read-more">อ่านต่อ <i class="fas fa-arrow-right"></i></a>
-                        </div>
+            const str = await response.text();
+            const data = new window.DOMParser().parseFromString(str, "text/xml");
+            const items = data.querySelectorAll("item");
+            
+            let html = ``;
+            items.forEach((el, index) => {
+                if (index >= 5) return; // Limit to 5 news items
+                const title = el.querySelector("title").textContent;
+                const link = el.querySelector("link").textContent;
+                const pubDate = new Date(el.querySelector("pubDate").textContent).toLocaleDateString('th-TH');
+                
+                html += `
+                    <div class="news-item">
+                        <h4><a href="${link}" target="_blank" rel="noopener noreferrer">${title}</a></h4>
+                        <p class="news-date">${pubDate}</p>
                     </div>
-                `}).join('');
-                newsContainer.innerHTML = articlesHtml;
-            } else {
-                newsContainer.innerHTML = `<p>ไม่พบข่าวสารในขณะนี้</p>`;
-            }
-        } catch (error) {
-            console.error("Could not fetch news:", error);
-            newsContainer.innerHTML = `<p>ขออภัย, ไม่สามารถโหลดข่าวสารได้ในขณะนี้ กรุณาลองใหม่อีกครั้ง</p>`;
-        }
-    }
+                `;
+            });
 
-    function addHomePageEventListeners() {
-        fetchNCDsNews();
+            if (items.length === 0) {
+                 newsContainer.innerHTML = '<p>ไม่พบข่าวสารในขณะนี้</p>';
+                 return;
+            }
+
+            newsContainer.innerHTML = html;
+
+        } catch (error) {
+            console.error("Error fetching WHO news feed:", error);
+            if (newsContainer) {
+                newsContainer.innerHTML = `<p>ขออภัย, ไม่สามารถโหลดข่าวสารได้ในขณะนี้ กรุณาลองใหม่ในภายหลัง</p>`;
+            }
+        }
     }
 
     // --- Init ---
