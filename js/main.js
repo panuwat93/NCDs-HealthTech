@@ -27,7 +27,6 @@ document.addEventListener('DOMContentLoaded', () => {
             currentDateEl.textContent = today.toLocaleDateString('th-TH', options);
         }
 
-        // Event Listeners
         menuToggleBtn?.addEventListener('click', () => sidebar.classList.toggle('open'));
         closeBtn?.addEventListener('click', () => sidebar.classList.remove('open'));
         logoutBtn?.addEventListener('click', () => {
@@ -43,7 +42,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 const pageName = e.target.closest('a').dataset.page;
                 if (pageName) {
                     loadPage(pageName);
-                    // Update active link
                     menuLinks.forEach(l => l.classList.remove('active'));
                     e.target.closest('a').classList.add('active');
                     if (window.innerWidth <= 768) sidebar.classList.remove('open');
@@ -67,7 +65,6 @@ document.addEventListener('DOMContentLoaded', () => {
             'tracking-record': renderTrackingRecordPage,
             'emergency': renderEmergencyPage,
         };
-
         const renderer = pageRenderers[pageName] || renderHomePage;
         contentContainer.innerHTML = renderer();
         addPageEventListeners(pageName);
@@ -83,7 +80,6 @@ document.addEventListener('DOMContentLoaded', () => {
             'food-recommendations': addFoodPageEventListeners,
             'tracking-record': addTrackingRecordPageEventListeners,
         };
-
         const listener = eventListeners[pageName];
         if (listener) listener();
     }
@@ -92,7 +88,6 @@ document.addEventListener('DOMContentLoaded', () => {
     async function handleProfilePicUpload(event) {
         const file = event.target.files[0];
         if (!file) return;
-
         const reader = new FileReader();
         reader.onload = async function(e) {
             const imageDataUrl = e.target.result;
@@ -252,130 +247,116 @@ document.addEventListener('DOMContentLoaded', () => {
     function renderBMIPage() {
         return `
             <div class="page-header">
-                <h2><i class="fas fa-calculator"></i> คำนวณ BMI</h2>
-                <p>บันทึกน้ำหนักและส่วนสูงเพื่อคำนวณดัชนีมวลกายของคุณ</p>
+                <h2><i class="fas fa-calculator"></i> คำนวณดัชนีมวลกาย (BMI)</h2>
+                <p>กรอกข้อมูลเพื่อคำนวณ BMI และดูผลลัพธ์</p>
             </div>
             <div class="bmi-grid">
-                <div class="form-container">
+                <div class="form-container form-card">
                     <form id="bmi-form">
                         <div class="input-group">
-                            <label for="height">ส่วนสูง (cm)</label>
-                            <input type="number" id="height" required>
-                        </div>
-                        <div class="input-group">
-                            <label for="weight">น้ำหนัก (kg)</label>
+                            <label for="weight">น้ำหนัก (กิโลกรัม)</label>
                             <input type="number" id="weight" step="0.1" required>
                         </div>
-                        <button type="submit" class="button-primary">คำนวณและบันทึก</button>
+                        <div class="input-group">
+                            <label for="height">ส่วนสูง (เซนติเมตร)</label>
+                            <input type="number" id="height" required>
+                        </div>
+                        <button type="submit" class="button-primary">คำนวณ</button>
                     </form>
-                    <p id="bmi-notice" class="notice-message" style="display:none;">คุณสามารถบันทึกน้ำหนักได้วันละ 1 ครั้ง</p>
                 </div>
-                <div id="bmi-result-container"></div>
+                <div id="bmi-result-container" class="bmi-result-card card" style="display: none;">
+                    <h3>ผลลัพธ์ BMI ของคุณ</h3>
+                    <p class="bmi-value"></p>
+                    <p class="bmi-category"></p>
+                    <div class="bmi-interpretation"></div>
+                </div>
             </div>`;
     }
 
     async function addBMIPageEventListeners() {
         const form = document.getElementById('bmi-form');
+        const weightInput = document.getElementById('weight');
         const heightInput = document.getElementById('height');
-        const noticeEl = document.getElementById('bmi-notice');
 
-        // Load last used height
-        const lastBmiRecord = (await DBGetAll('bmiRecords')).filter(r => r.username === user.username).pop();
-        if (lastBmiRecord && lastBmiRecord.height) {
-            heightInput.value = lastBmiRecord.height;
-        }
+        try {
+            const trackingData = await DBGetAll('tracking');
+            if (trackingData.length > 0) {
+                const latestRecord = trackingData.sort((a, b) => new Date(b.date) - new Date(a.date))[0];
+                if (latestRecord.weight) weightInput.value = latestRecord.weight;
+                if (latestRecord.height) heightInput.value = latestRecord.height;
+            }
+        } catch (e) { console.error("Could not load latest tracking data for BMI"); }
 
-        // Check if already recorded today
-        const todayStr = new Date().toISOString().split('T')[0];
-        const todayRecord = (await DBGetAll('bmiRecords')).find(r => r.username === user.username && r.date === todayStr);
-        if (todayRecord) {
-            form.querySelector('button').disabled = true;
-            noticeEl.style.display = 'block';
-            displayBMIResult(todayRecord.weight, todayRecord.height);
-        }
-
-        form.addEventListener('submit', async (e) => {
+        form.addEventListener('submit', (e) => {
             e.preventDefault();
-            const height = parseFloat(heightInput.value);
-            const weight = parseFloat(document.getElementById('weight').value);
-            const date = new Date().toISOString().split('T')[0];
-            const record = { id: `${user.username}-${date}`, username: user.username, date, weight, height };
-            
-            await DBPut('bmiRecords', record);
-            alert('บันทึกข้อมูล BMI สำเร็จ');
-            displayBMIResult(weight, height);
-            form.querySelector('button').disabled = true;
-            noticeEl.style.display = 'block';
+            displayBMIResult(weightInput.value, heightInput.value);
         });
     }
 
     function displayBMIResult(weight, height) {
-        const bmi = weight / ((height / 100) ** 2);
-        const { category, color, interpretation } = getBMIDetails(bmi);
         const resultContainer = document.getElementById('bmi-result-container');
-        resultContainer.innerHTML = `
-            <div class="bmi-result-card" style="border-top: 5px solid ${color};">
-                <h3>ผลลัพธ์ BMI ของคุณ</h3>
-                <div class="bmi-value" style="color: ${color};">${bmi.toFixed(2)}</div>
-                <div class="bmi-category" style="background-color: ${color};">${category}</div>
-                <div class="bmi-interpretation"><p>${interpretation}</p></div>
-            </div>`;
+        if (!weight || !height || height <= 0) {
+            resultContainer.style.display = 'none';
+            return;
+        }
+        const heightInMeters = height / 100;
+        const bmi = (weight / (heightInMeters * heightInMeters)).toFixed(2);
+        const details = getBMIDetails(bmi);
+
+        resultContainer.querySelector('.bmi-value').textContent = `BMI: ${bmi}`;
+        resultContainer.querySelector('.bmi-category').textContent = `เกณฑ์: ${details.category}`;
+        resultContainer.querySelector('.bmi-interpretation').innerHTML = `<p>${details.interpretation}</p>`;
+        resultContainer.querySelector('.bmi-category').style.color = details.color;
+        resultContainer.style.display = 'block';
     }
 
     function getBMIDetails(bmi) {
-        if (bmi < 18.5) return { category: 'น้ำหนักน้อย', color: '#3498db', interpretation: 'คุณมีน้ำหนักตัวน้อยเกินไป ควรเพิ่มน้ำหนักด้วยการรับประทานอาหารที่มีประโยชน์และมีแคลอรี่สูงขึ้น' };
-        if (bmi < 23) return { category: 'สมส่วน', color: '#2ecc71', interpretation: 'คุณมีน้ำหนักตัวที่เหมาะสม ดีแล้ว! รักษาน้ำหนักนี้ไว้ด้วยการทานอาหารที่ดีและออกกำลังกายสม่ำเสมอ' };
-        if (bmi < 25) return { category: 'น้ำหนักเกิน', color: '#f1c40f', interpretation: 'คุณเริ่มมีน้ำหนักตัวเกิน ควรควบคุมอาหารและเพิ่มการออกกำลังกายเพื่อลดความเสี่ยงต่อโรคต่างๆ' };
-        if (bmi < 30) return { category: 'โรคอ้วนระดับ 1', color: '#e67e22', interpretation: 'คุณอยู่ในภาวะอ้วนระดับที่ 1 ซึ่งมีความเสี่ยงต่อโรคเบาหวานและความดันโลหิตสูง ควรปรึกษาแพทย์เพื่อวางแผนลดน้ำหนัก' };
-        return { category: 'โรคอ้วนระดับ 2', color: '#c0392b', interpretation: 'คุณอยู่ในภาวะอ้วนระดับอันตราย มีความเสี่ยงสูงมากต่อโรค NCDs ควรปรึกษาแพทย์หรือนักโภชนาการเพื่อลดน้ำหนักอย่างเร่งด่วน' };
+        if (bmi < 18.5) return { category: 'น้ำหนักน้อย / ผอม', interpretation: 'ควรรับประทานอาหารที่มีคุณภาพและออกกำลังกายเพื่อเสริมสร้างกล้ามเนื้อ', color: '#3498db' };
+        if (bmi >= 18.5 && bmi <= 22.9) return { category: 'ปกติ (สุขภาพดี)', interpretation: 'รักษาน้ำหนักและวิถีชีวิตเพื่อสุขภาพที่ดีต่อไป', color: '#2ecc71' };
+        if (bmi >= 23 && bmi <= 24.9) return { category: 'ท้วม / น้ำหนักเกิน', interpretation: 'ควรควบคุมอาหารและเพิ่มการออกกำลังกายเพื่อลดความเสี่ยงต่อโรค', color: '#f1c40f' };
+        if (bmi >= 25 && bmi <= 29.9) return { category: 'อ้วนระดับ 1', interpretation: 'มีความเสี่ยงต่อการเกิดโรคไม่ติดต่อเรื้อรัง ควรปรึกษาแพทย์หรือนักโภชนาการ', color: '#e67e22' };
+        if (bmi >= 30) return { category: 'อ้วนระดับ 2 (อันตราย)', interpretation: 'มีความเสี่ยงสูงมากต่อการเกิดโรคร้ายแรง ควรปรึกษาแพทย์เพื่อรับการรักษาอย่างจริงจัง', color: '#e74c3c' };
+        return { category: '', interpretation: '', color: '#000' };
     }
 
-    // --- Exercise Page ---
     function renderExercisePage() {
+        const filtersHtml = exerciseTypes.map(type => `<button class="button-secondary" data-type="${type.type}">${type.name}</button>`).join('');
         return `
             <div class="page-header">
                 <h2><i class="fas fa-dumbbell"></i> แนะนำการออกกำลังกาย</h2>
-                <p>โปรแกรมออกกำลังกายที่เหมาะสมสำหรับคุณโดยเฉพาะ</p>
+                <p>เลือกประเภทการออกกำลังกายที่คุณสนใจ</p>
             </div>
-            <div id="exercise-content" class="exercise-list"><p>กำลังวิเคราะห์ข้อมูลและสร้างคำแนะนำ...</p></div>`;
+            <div id="exercise-filters">${filtersHtml}</div>
+            <div id="exercise-list" class="exercise-grid"></div>`;
     }
 
     async function addExercisePageEventListeners() {
-        const container = document.getElementById('exercise-content');
-        const filters = document.querySelectorAll('#exercise-filters input[type="checkbox"]');
-
-        function renderList() {
-            const selectedIntensities = Array.from(filters)
-                .filter(cb => cb.checked && cb.name === 'intensity')
-                .map(cb => cb.value);
-
-            const filteredData = exerciseData.filter(ex => 
-                selectedIntensities.length === 0 || selectedIntensities.includes(ex.intensity.toLowerCase())
-            );
-
+        const filtersContainer = document.getElementById('exercise-filters');
+        const listContainer = document.getElementById('exercise-list');
+        
+        function renderList(filter = 'all') {
+            const filteredData = filter === 'all' ? exerciseData : exerciseData.filter(ex => ex.type === filter);
             if (filteredData.length === 0) {
-                container.innerHTML = '<p>ไม่พบรายการออกกำลังกายที่ตรงกับเงื่อนไข</p>';
+                listContainer.innerHTML = '<p>ไม่พบข้อมูลการออกกำลังกายในประเภทนี้</p>';
                 return;
             }
-
-            container.innerHTML = filteredData.map(ex => `
-                <div class="exercise-card">
+            const listHtml = filteredData.map(ex => `
+                <div class="exercise-card card" data-id="${ex.id}">
                     <div class="card-content">
                         <h3>${ex.name}</h3>
-                        <p>${ex.description}</p>
                         <div class="card-details">
-                            <span><strong>ประเภท:</strong> ${ex.category}</span>
-                            <span><strong>ความหนัก:</strong> ${ex.intensity}</span>
+                            <span><i class="fas fa-tag"></i> ${exerciseTypes.find(t => t.type === ex.type)?.name || ''}</span>
+                            <span><i class="fas fa-clock"></i> ${ex.duration}</span>
                         </div>
                     </div>
                 </div>
             `).join('');
+            listContainer.innerHTML = listHtml;
 
-            // Add click listeners to new cards
-            document.querySelectorAll('.exercise-card').forEach((card, index) => {
+            document.querySelectorAll('.exercise-card').forEach(card => {
                 card.addEventListener('click', () => {
-                    // Use the index to find the correct data from the *filtered* list
-                    renderExerciseDetail(filteredData[index]);
+                    const exercise = exerciseData.find(ex => ex.id === parseInt(card.dataset.id));
+                    if (exercise) renderExerciseDetail(exercise);
                 });
             });
         }
@@ -386,174 +367,231 @@ document.addEventListener('DOMContentLoaded', () => {
                     <button class="btn-back" id="back-to-exercise-list"><i class="fas fa-arrow-left"></i> กลับไปที่รายการ</button>
                     <h2>${exercise.name}</h2>
                 </div>
-                <div class="exercise-detail-content">
-                    <p><strong>ประเภท:</strong> ${exercise.category} | <strong>ความหนัก:</strong> ${exercise.intensity}</p>
-                    <p>${exercise.description}</p>
-                    <h3><i class="fas fa-shoe-prints"></i> ขั้นตอนการปฏิบัติ</h3>
+                <div class="exercise-detail-content card">
+                    <h3><i class="fas fa-bullseye"></i> ประโยชน์</h3>
+                    <p>${exercise.benefits}</p>
+                    <h3><i class="fas fa-walking"></i> ขั้นตอนการปฏิบัติ</h3>
                     <ol>${exercise.steps.map(step => `<li>${step}</li>`).join('')}</ol>
-                </div>`;
-            document.getElementById('page-content').innerHTML = detailHtml;
+                </div>
+            `;
+            contentContainer.innerHTML = detailHtml;
             document.getElementById('back-to-exercise-list').addEventListener('click', () => loadPage('exercise-recommendations'));
         }
 
-        filters.forEach(cb => cb.addEventListener('change', renderList));
-        renderList();
+        filtersContainer.addEventListener('click', (e) => {
+            if (e.target.tagName === 'BUTTON') {
+                document.querySelectorAll('#exercise-filters button').forEach(btn => btn.classList.remove('active'));
+                e.target.classList.add('active');
+                renderList(e.target.dataset.type);
+            }
+        });
+
+        renderList('all'); // Initial render
+        filtersContainer.querySelector('button[data-type="all"]')?.classList.add('active');
     }
 
-    // --- Food Page ---
     function renderFoodPage() {
         return `
-           <div class="page-header">
-               <h2><i class="fas fa-utensils"></i> แนะนำแผนอาหาร</h2>
-               <p>แผนอาหารที่เหมาะสำหรับสุขภาพและเป้าหมายของคุณ</p>
-           </div>
-           <div id="food-content"><p>กำลังวิเคราะห์ข้อมูลและสร้างคำแนะนำ...</p></div>`;
+            <div class="page-header">
+                <h2><i class="fas fa-utensils"></i> แนะนำอาหาร</h2>
+                <p>ตัวอย่างแผนอาหารเพื่อสุขภาพใน 1 สัปดาห์</p>
+            </div>
+            <div class="food-plan-header">
+                <p>แผนอาหารนี้เป็นเพียงตัวอย่าง ควรปรับเปลี่ยนให้เหมาะสมกับความต้องการและข้อจำกัดของแต่ละบุคคล</p>
+            </div>
+            <div id="food-plan-container" class="food-plan-grid"></div>
+        `;
     }
 
     async function addFoodPageEventListeners() {
-        const contentEl = document.getElementById('food-content');
-        try {
-            const healthProfile = await DBGet('healthProfile', user.username);
-            const allBmiRecords = await DBGetAll('bmiRecords');
-            const userBmiRecords = allBmiRecords.filter(r => r.username === user.username).sort((a, b) => new Date(b.date) - new Date(a.date));
-            const userTags = new Set(['all']);
-            if (userBmiRecords.length > 0) {
-                const bmi = userBmiRecords[0].weight / ((userBmiRecords[0].height / 100) ** 2);
-                if (bmi >= 23) userTags.add('overweight');
-                if (bmi >= 30) userTags.add('obese');
-            }
-            if (healthProfile && (healthProfile.chronicDiseases.includes('เบาหวาน') || healthProfile.chronicDiseases.includes('diabetes'))) {
-                userTags.add('diabetes');
-            }
-            let recommendedPlan = foodData.find(p => p.targetGroups.some(g => g !== 'all' && userTags.has(g))) || foodData.find(p => p.targetGroups.includes('all'));
-            if (recommendedPlan) {
-                const daysOfWeek = ['จันทร์', 'อังคาร', 'พุธ', 'พฤหัสบดี', 'ศุกร์', 'เสาร์', 'อาทิตย์'];
-                const planHtml = daysOfWeek.map(day => `
-                    <div class="day-card">
-                        <h4>${day}</h4>
-                        <div class="meal"><span class="meal-type">เช้า:</span><p>${recommendedPlan.weeklyPlan[day]?.breakfast || '-'}</p></div>
-                        <div class="meal"><span class="meal-type">กลางวัน:</span><p>${recommendedPlan.weeklyPlan[day]?.lunch || '-'}</p></div>
-                        <div class="meal"><span class="meal-type">เย็น:</span><p>${recommendedPlan.weeklyPlan[day]?.dinner || '-'}</p></div>
-                    </div>`).join('');
-                contentEl.innerHTML = `
-                    <div class="food-plan-header"><h3>${recommendedPlan.name}</h3><p>${recommendedPlan.description}</p></div>
-                    <div class="food-plan-grid">${planHtml}</div>`;
-            } else {
-                 contentEl.innerHTML = '<p>ไม่พบแผนอาหารที่เหมาะสม</p>';
-            }
-        } catch (error) {
-            console.error("Error loading food recommendations:", error);
-            contentEl.innerHTML = '<p>เกิดข้อผิดพลาดในการโหลดคำแนะนำอาหาร</p>';
-        }
+        const container = document.getElementById('food-plan-container');
+        const planHtml = foodData.map(day => `
+            <div class="day-card card">
+                <h4>${day.day}</h4>
+                <div class="meal">
+                    <span class="meal-type">เช้า:</span>
+                    <p>${day.meals.breakfast}</p>
+                </div>
+                <div class="meal">
+                    <span class="meal-type">กลางวัน:</span>
+                    <p>${day.meals.lunch}</p>
+                </div>
+                <div class="meal">
+                    <span class="meal-type">เย็น:</span>
+                    <p>${day.meals.dinner}</p>
+                </div>
+            </div>
+        `).join('');
+        container.innerHTML = planHtml;
     }
 
-    // --- Tracking Record Page ---
-    let trackingChart = null;
     function renderTrackingRecordPage() {
-        const yearOptions = Array.from({length: 5}, (_, i) => `<option value="${new Date().getFullYear() - i}">${new Date().getFullYear() - i + 543}</option>`).join('');
-        const monthOptions = ['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'].map((m, i) => `<option value="${i}">${m}</option>`).join('');
         return `
             <div class="page-header">
                 <h2><i class="fas fa-chart-line"></i> บันทึกการเปลี่ยนแปลง</h2>
-                <p>ติดตามการเปลี่ยนแปลงของร่างกายและดูแนวโน้ม</p>
+                <p>บันทึกและติดตามข้อมูลสุขภาพของคุณ เช่น น้ำหนัก ส่วนสูง ความดันโลหิต และระดับน้ำตาลในเลือด</p>
             </div>
-            <div class="form-container-grid">
-                <div class="form-card">
-                    <h3><i class="fas fa-edit"></i> ลงบันทึกวันนี้</h3>
+            <div class="tracking-grid">
+                <div class="form-container-grid form-card card">
+                     <h3>บันทึกข้อมูลวันนี้</h3>
                     <form id="tracking-form">
-                        <div class="form-group"><label for="record-date">วันที่</label><input type="date" id="record-date" required></div>
-                        <div class="form-group"><label for="record-weight">น้ำหนัก (kg)</label><input type="number" id="record-weight" step="0.1" required placeholder="เช่น 65.5"></div>
-                        <div class="form-group"><label for="record-chest">รอบอก (cm)</label><input type="number" id="record-chest" step="0.1" placeholder="เช่น 90"></div>
-                        <div class="form-group"><label for="record-waist">รอบเอว (cm)</label><input type="number"id="record-waist" step="0.1" placeholder="เช่น 80"></div>
-                        <button type="submit" class="button-primary">บันทึกข้อมูล</button>
+                        <div class="input-group">
+                            <label for="track-date">วันที่</label>
+                            <input type="date" id="track-date" required>
+                        </div>
+                        <div class="input-group">
+                            <label for="track-weight">น้ำหนัก (kg)</label>
+                            <input type="number" step="0.1" id="track-weight">
+                        </div>
+                        <div class="input-group">
+                            <label for="track-height">ส่วนสูง (cm)</label>
+                            <input type="number" step="0.1" id="track-height">
+                        </div>
+                        <div class="input-group">
+                            <label for="track-bp">ความดันโลหิต (เช่น 120/80)</label>
+                            <input type="text" id="track-bp" placeholder="ค่าบน/ค่าล่าง">
+                        </div>
+                        <div class="input-group">
+                            <label for="track-glucose">ระดับน้ำตาลในเลือด (mg/dL)</label>
+                            <input type="number" id="track-glucose">
+                        </div>
+                        <button type="submit" class="button-primary">บันทึก</button>
                     </form>
                 </div>
-                <div class="chart-card">
-                    <h3><i class="fas fa-history"></i> ดูประวัติย้อนหลัง</h3>
-                     <div class="chart-controls">
-                        <div class="form-group"><label for="month-select">เลือกเดือน:</label><select id="month-select">${monthOptions}</select></div>
-                        <div class="form-group"><label for="year-select">เลือกปี:</label><select id="year-select">${yearOptions}</select></div>
+                <div class="chart-card card">
+                    <h3>กราฟติดตามผล</h3>
+                    <div class="chart-controls">
+                        <select id="chart-type">
+                            <option value="weight">น้ำหนัก</option>
+                            <option value="bp">ความดันโลหิต</option>
+                            <option value="glucose">ระดับน้ำตาล</option>
+                        </select>
                     </div>
                     <canvas id="tracking-chart"></canvas>
-                    <button id="export-csv-btn" class="button-secondary"><i class="fas fa-file-csv"></i> ส่งออกข้อมูลเป็น CSV</button>
+                    <div class="export-btn-container">
+                        <button id="export-csv-btn" class="button-secondary">ส่งออกเป็น CSV</button>
+                    </div>
                 </div>
-            </div>`;
+            </div>
+            `;
     }
 
     function addTrackingRecordPageEventListeners() {
-        document.getElementById('record-date').valueAsDate = new Date();
+        document.getElementById('track-date').valueAsDate = new Date();
+        const chartTypeSelect = document.getElementById('chart-type');
+
         document.getElementById('tracking-form').addEventListener('submit', saveTrackingRecord);
-        document.getElementById('month-select').addEventListener('change', renderTrackingChart);
-        document.getElementById('year-select').addEventListener('change', renderTrackingChart);
+        chartTypeSelect.addEventListener('change', renderTrackingChart);
         document.getElementById('export-csv-btn').addEventListener('click', exportTrackingDataToCSV);
-        const today = new Date();
-        document.getElementById('month-select').value = today.getMonth();
-        document.getElementById('year-select').value = today.getFullYear();
+
         renderTrackingChart();
     }
 
     async function saveTrackingRecord(event) {
         event.preventDefault();
-        const date = document.getElementById('record-date').value;
         const record = {
-            id: `${user.username}-${date}`,
+            id: Date.now(),
             username: user.username,
-            date,
-            weight: parseFloat(document.getElementById('record-weight').value),
-            chest: document.getElementById('record-chest').value ? parseFloat(document.getElementById('record-chest').value) : null,
-            waist: document.getElementById('record-waist').value ? parseFloat(document.getElementById('record-waist').value) : null,
+            date: document.getElementById('track-date').value,
+            weight: document.getElementById('track-weight').value || null,
+            height: document.getElementById('track-height').value || null,
+            bp: document.getElementById('track-bp').value || null,
+            glucose: document.getElementById('track-glucose').value || null,
         };
+
+        if (record.bp && !/^\d{2,3}\/\d{2,3}$/.test(record.bp)) {
+            alert('รูปแบบความดันโลหิตไม่ถูกต้อง กรุณใช้รูปแบบ "ค่าบน/ค่าล่าง" เช่น 120/80');
+            return;
+        }
+
         try {
-            await DBPut('trackingRecords', record);
-            alert('บันทึกข้อมูลเรียบร้อยแล้ว');
+            await DBPut('tracking', record);
+            alert('บันทึกข้อมูลสำเร็จ!');
             event.target.reset();
-            document.getElementById('record-date').valueAsDate = new Date();
-            await renderTrackingChart();
+            document.getElementById('track-date').valueAsDate = new Date();
+            renderTrackingChart();
         } catch (error) {
-            alert('ไม่สามารถบันทึกซ้ำในวันเดียวกันได้ หรือเกิดข้อผิดพลาดอื่น');
+            console.error('Failed to save tracking record:', error);
+            alert('ไม่สามารถบันทึกข้อมูลได้');
         }
     }
     
+    let chartInstance = null;
     async function renderTrackingChart() {
-        const month = parseInt(document.getElementById('month-select').value);
-        const year = parseInt(document.getElementById('year-select').value);
+        const chartType = document.getElementById('chart-type').value;
         const ctx = document.getElementById('tracking-chart').getContext('2d');
-        const allRecords = await DBGetAll('trackingRecords');
-        const userRecords = allRecords.filter(r => r.username === user.username && new Date(r.date).getFullYear() === year && new Date(r.date).getMonth() === month).sort((a, b) => new Date(a.date) - new Date(b.date));
-        if (trackingChart) trackingChart.destroy();
-        trackingChart = new Chart(ctx, {
+        const trackingData = (await DBGetAll('tracking')).filter(d => d.username === user.username).sort((a,b) => new Date(a.date) - new Date(b.date));
+
+        if (chartInstance) {
+            chartInstance.destroy();
+        }
+
+        let chartConfig = {
             type: 'line',
-            data: {
-                labels: userRecords.map(r => new Date(r.date).getDate()),
-                datasets: [
-                    { label: 'น้ำหนัก (kg)', data: userRecords.map(r => r.weight), borderColor: '#4CAF50', yAxisID: 'y', tension: 0.1 },
-                    { label: 'รอบอก (cm)', data: userRecords.map(r => r.chest), borderColor: '#FFC107', yAxisID: 'y1', tension: 0.1, hidden: true },
-                    { label: 'รอบเอว (cm)', data: userRecords.map(r => r.waist), borderColor: '#2196F3', yAxisID: 'y1', tension: 0.1, hidden: true }
-                ]
-            },
+            data: { labels: [], datasets: [] },
             options: {
-                responsive: true, maintainAspectRatio: false,
-                plugins: { title: { display: true, text: `ข้อมูลประจำเดือน ${document.getElementById('month-select').options[month].text} ปี ${year + 543}` } },
-                scales: {
-                    y: { type: 'linear', display: true, position: 'left', title: { display: true, text: 'น้ำหนัก (kg)' } },
-                    y1: { type: 'linear', display: true, position: 'right', title: { display: true, text: 'ขนาด (cm)' }, grid: { drawOnChartArea: false } },
-                }
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: { y: { beginAtZero: false } }
             }
-        });
-    }
-    
-    async function exportTrackingDataToCSV() {
-        const allRecords = await DBGetAll('trackingRecords');
-        const userRecords = allRecords.filter(r => r.username === user.username).sort((a, b) => new Date(a.date) - new Date(b.date));
-        if (userRecords.length === 0) return alert('ไม่พบข้อมูลสำหรับส่งออก');
-        let csvContent = "data:text/csv;charset=utf-8,\uFEFF" + "วันที่,น้ำหนัก (kg),รอบอก (cm),รอบเอว (cm)\r\n";
-        userRecords.forEach(r => csvContent += `${r.date},${r.weight || ''},${r.chest || ''},${r.waist || ''}\r\n`);
-        const link = document.createElement("a");
-        link.setAttribute("href", encodeURI(csvContent));
-        link.setAttribute("download", `tracking_data_${user.username}.csv`);
-        link.click();
+        };
+
+        switch (chartType) {
+            case 'weight':
+                chartConfig.data.labels = trackingData.map(d => d.date);
+                chartConfig.data.datasets.push({
+                    label: 'น้ำหนัก (kg)',
+                    data: trackingData.map(d => d.weight),
+                    borderColor: '#3498db',
+                    fill: false
+                });
+                break;
+            case 'bp':
+                chartConfig.data.labels = trackingData.filter(d => d.bp).map(d => d.date);
+                chartConfig.data.datasets.push({
+                    label: 'ความดัน (ตัวบน)',
+                    data: trackingData.filter(d => d.bp).map(d => d.bp.split('/')[0]),
+                    borderColor: '#e74c3c',
+                    fill: false
+                }, {
+                    label: 'ความดัน (ตัวล่าง)',
+                    data: trackingData.filter(d => d.bp).map(d => d.bp.split('/')[1]),
+                    borderColor: '#f1c40f',
+                    fill: false
+                });
+                break;
+            case 'glucose':
+                chartConfig.data.labels = trackingData.filter(d => d.glucose).map(d => d.date);
+                chartConfig.data.datasets.push({
+                    label: 'ระดับน้ำตาล (mg/dL)',
+                    data: trackingData.filter(d => d.glucose).map(d => d.glucose),
+                    borderColor: '#2ecc71',
+                    fill: false
+                });
+                break;
+        }
+        chartInstance = new Chart(ctx, chartConfig);
     }
 
+    async function exportTrackingDataToCSV() {
+        const trackingData = (await DBGetAll('tracking')).filter(d => d.username === user.username);
+        if (trackingData.length === 0) {
+            alert('ไม่มีข้อมูลสำหรับส่งออก');
+            return;
+        }
+        let csvContent = "data:text/csv;charset=utf-8,Date,Weight (kg),Height (cm),Blood Pressure,Glucose (mg/dL)\n";
+        trackingData.forEach(row => {
+            csvContent += `${row.date},${row.weight || ''},${row.height || ''},"${row.bp || ''}",${row.glucose || ''}\n`;
+        });
+        const encodedUri = encodeURI(csvContent);
+        const link = document.createElement("a");
+        link.setAttribute("href", encodedUri);
+        link.setAttribute("download", "health_tracking_data.csv");
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    }
+    
     // --- Emergency Page ---
     function renderEmergencyPage() {
         const listHtml = emergencyData.map(contact => `
@@ -574,45 +612,20 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function fetchNCDsNews() {
-    const newsContainer = document.getElementById('news-feed-container');
-    if (!newsContainer) return;
+        const newsContainer = document.getElementById('news-feed-container');
+        if (!newsContainer) return;
 
-    newsContainer.innerHTML = `<p class="loading-news">กำลังโหลดข่าวสารล่าสุด...</p>`;
+        newsContainer.innerHTML = `<p class="loading-news">กำลังโหลดข่าวสารล่าสุด...</p>`;
 
-    // Switched to a more reliable, open source (WHO RSS Feed) via a proxy to avoid CORS issues on deployment
-    const RSS_URL = 'https://www.who.int/rss-feeds/news-rss.xml';
-    const API_URL = `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(RSS_URL)}`;
+        // Switched to a more reliable, open source (WHO RSS Feed) via a proxy to avoid CORS issues on deployment
+        const RSS_URL = 'https://www.who.int/rss-feeds/news-rss.xml';
+        const API_URL = `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(RSS_URL)}`;
 
-    try {
-        const response = await fetch(API_URL);
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        const data = await response.json();
-
-        if (data && data.status === 'ok' && data.items) {
-            const articles = data.items.slice(0, 5); // Get latest 5 articles
-            let articlesHtml = articles.map(article => {
-                const description = (article.description || '').replace(/<[^>]*>/g, "").substring(0, 150);
-                return `
-                <div class="news-article">
-                    <h4><a href="${article.link}" target="_blank" rel="noopener noreferrer">${article.title}</a></h4>
-                    <p class="news-description">${description}...</p>
-                    <div class="news-footer">
-                        <span>${new Date(article.pubDate).toLocaleDateString('th-TH', { day: 'numeric', month: 'long', year: 'numeric' })}</span>
-                        <a href="${article.link}" target="_blank" rel="noopener noreferrer" class="read-more">อ่านต่อ <i class="fas fa-arrow-right"></i></a>
-                    </div>
-                </div>
-            `}).join('');
-            newsContainer.innerHTML = articlesHtml;
-        } else {
-            newsContainer.innerHTML = `<p>ไม่พบข่าวสารในขณะนี้</p>`;
-        }
-    } catch (error) {
-        console.error("Could not fetch news:", error);
-        newsContainer.innerHTML = `<p>ขออภัย, ไม่สามารถโหลดข่าวสารได้ในขณะนี้ กรุณาลองใหม่อีกครั้ง</p>`;
-    }
-}
+        try {
+            const response = await fetch(API_URL);
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
             const data = await response.json();
 
             if (data && data.status === 'ok' && data.items) {
@@ -643,6 +656,6 @@ document.addEventListener('DOMContentLoaded', () => {
         fetchNCDsNews();
     }
 
-    // --- Run App ---
+    // --- Init ---
     initializeApp();
-}); 
+});
