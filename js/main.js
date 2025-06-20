@@ -698,14 +698,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 <i class="${contact.icon}"></i>
                 <div class="contact-info">
                     <span class="contact-name">${contact.name}</span>
-                    <a href="tel:${contact.phone}" class="contact-number">${contact.phone}</a>
+                    <a href="tel:${contact.phone}" class="contact-number" title="คลิกเพื่อโทรออก">
+                        <i class="fas fa-phone"></i> ${contact.phone}
+                    </a>
                 </div>
             </div>
         `).join('');
         return `
             <div class="page-header">
                 <h2><i class="fas fa-phone-volume"></i> เบอร์โทรฉุกเฉิน</h2>
-                <p>เบอร์โทรศัพท์ที่สำคัญสำหรับเหตุการณ์ฉุกเฉิน</p>
+                <p>เบอร์โทรศัพท์ที่สำคัญสำหรับเหตุการณ์ฉุกเฉิน <br><span class="emergency-instruction">(คลิกที่เบอร์เพื่อโทรออก)</span></p>
             </div>
             <div class="emergency-list">${listHtml}</div>`;
     }
