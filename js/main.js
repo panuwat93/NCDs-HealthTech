@@ -250,181 +250,172 @@ document.addEventListener('DOMContentLoaded', () => {
                 <h2><i class="fas fa-calculator"></i> คำนวณดัชนีมวลกาย (BMI)</h2>
                 <p>กรอกข้อมูลเพื่อคำนวณ BMI และดูผลลัพธ์</p>
             </div>
-            <div class="bmi-grid">
-                <div class="form-container form-card">
-                    <form id="bmi-form">
-                        <div class="input-group">
-                            <label for="weight">น้ำหนัก (กิโลกรัม)</label>
-                            <input type="number" id="weight" step="0.1" required>
-                        </div>
-                        <div class="input-group">
-                            <label for="height">ส่วนสูง (เซนติเมตร)</label>
-                            <input type="number" id="height" required>
-                        </div>
-                        <button type="submit" class="button-primary">คำนวณ</button>
-                    </form>
-                </div>
-                <div id="bmi-result-container" class="bmi-result-card card" style="display: none;">
-                    <h3>ผลลัพธ์ BMI ของคุณ</h3>
-                    <p class="bmi-value"></p>
-                    <p class="bmi-category"></p>
-                    <div class="bmi-interpretation"></div>
-                </div>
+            <div class="form-container">
+                <form id="bmi-form">
+                    <div class="input-group">
+                        <label for="weight">น้ำหนัก (กิโลกรัม)</label>
+                        <input type="number" id="weight" placeholder="เช่น 60.5" step="0.1" required>
+                    </div>
+                    <div class="input-group">
+                        <label for="height">ส่วนสูง (เซนติเมตร)</label>
+                        <input type="number" id="height" placeholder="เช่น 170" required>
+                    </div>
+                    <button type="submit" class="button-primary" id="bmi-submit-btn">คำนวณ BMI</button>
+                </form>
+                <div id="bmi-result" class="bmi-result-container" style="display:none;"></div>
             </div>`;
     }
 
     async function addBMIPageEventListeners() {
         const form = document.getElementById('bmi-form');
-        const weightInput = document.getElementById('weight');
-        const heightInput = document.getElementById('height');
+        const resultDiv = document.getElementById('bmi-result');
+        const submitBtn = document.getElementById('bmi-submit-btn');
 
-        try {
-            const trackingData = await DBGetAll('tracking');
-            if (trackingData.length > 0) {
-                const latestRecord = trackingData.sort((a, b) => new Date(b.date) - new Date(a.date))[0];
-                if (latestRecord.weight) weightInput.value = latestRecord.weight;
-                if (latestRecord.height) heightInput.value = latestRecord.height;
-            }
-        } catch (e) { console.error("Could not load latest tracking data for BMI"); }
+        const todayStr = new Date().toISOString().split('T')[0];
+        const lastRecord = await DBGet('bmiRecords', user.username);
 
-        form.addEventListener('submit', (e) => {
+        if (lastRecord && lastRecord.date === todayStr) {
+            // Already calculated today
+            displayBMIResult(lastRecord.bmi, resultDiv);
+            form.style.display = 'none';
+        }
+
+        form.addEventListener('submit', async (e) => {
             e.preventDefault();
-            displayBMIResult(weightInput.value, heightInput.value);
+            const weight = parseFloat(document.getElementById('weight').value);
+            const height = parseFloat(document.getElementById('height').value);
+            if (isNaN(weight) || isNaN(height) || height <= 0) {
+                alert('กรุณากรอกข้อมูลให้ถูกต้อง');
+                return;
+            }
+            const bmi = weight / ((height / 100) ** 2);
+            
+            await DBPut('bmiRecords', { username: user.username, bmi: bmi, date: todayStr });
+            
+            displayBMIResult(bmi, resultDiv);
+            form.style.display = 'none';
         });
     }
 
-    function displayBMIResult(weight, height) {
-        const resultContainer = document.getElementById('bmi-result-container');
-        if (!weight || !height || height <= 0) {
-            resultContainer.style.display = 'none';
-            return;
-        }
-        const heightInMeters = height / 100;
-        const bmi = (weight / (heightInMeters * heightInMeters)).toFixed(2);
-        const details = getBMIDetails(bmi);
-
-        resultContainer.querySelector('.bmi-value').textContent = `BMI: ${bmi}`;
-        resultContainer.querySelector('.bmi-category').textContent = `เกณฑ์: ${details.category}`;
-        resultContainer.querySelector('.bmi-interpretation').innerHTML = `<p>${details.interpretation}</p>`;
-        resultContainer.querySelector('.bmi-category').style.color = details.color;
-        resultContainer.style.display = 'block';
+    function displayBMIResult(bmi, container) {
+        const result = getBMIDetails(bmi);
+        container.innerHTML = `
+            <h3>ผลลัพธ์ BMI ของคุณ</h3>
+            <p class="bmi-value" style="color:${result.color};">${bmi.toFixed(2)}</p>
+            <p class="bmi-category" style="color:${result.color};"><strong>${result.category}</strong></p>
+            <p class="bmi-advice">${result.advice}</p>
+        `;
+        container.style.display = 'block';
     }
 
     function getBMIDetails(bmi) {
-        if (bmi < 18.5) return { category: 'น้ำหนักน้อย / ผอม', interpretation: 'ควรรับประทานอาหารที่มีคุณภาพและออกกำลังกายเพื่อเสริมสร้างกล้ามเนื้อ', color: '#3498db' };
-        if (bmi >= 18.5 && bmi <= 22.9) return { category: 'ปกติ (สุขภาพดี)', interpretation: 'รักษาน้ำหนักและวิถีชีวิตเพื่อสุขภาพที่ดีต่อไป', color: '#2ecc71' };
-        if (bmi >= 23 && bmi <= 24.9) return { category: 'ท้วม / น้ำหนักเกิน', interpretation: 'ควรควบคุมอาหารและเพิ่มการออกกำลังกายเพื่อลดความเสี่ยงต่อโรค', color: '#f1c40f' };
-        if (bmi >= 25 && bmi <= 29.9) return { category: 'อ้วนระดับ 1', interpretation: 'มีความเสี่ยงต่อการเกิดโรคไม่ติดต่อเรื้อรัง ควรปรึกษาแพทย์หรือนักโภชนาการ', color: '#e67e22' };
-        if (bmi >= 30) return { category: 'อ้วนระดับ 2 (อันตราย)', interpretation: 'มีความเสี่ยงสูงมากต่อการเกิดโรคร้ายแรง ควรปรึกษาแพทย์เพื่อรับการรักษาอย่างจริงจัง', color: '#e74c3c' };
-        return { category: '', interpretation: '', color: '#000' };
+        if (bmi < 18.5) return { category: 'น้ำหนักน้อยกว่าเกณฑ์', advice: 'ควรรับประทานอาหารที่มีประโยชน์และออกกำลังกายเพื่อเสริมสร้างกล้ามเนื้อ', color: '#3498db' };
+        if (bmi < 23) return { category: 'น้ำหนักปกติ', advice: 'เยี่ยมมาก! รักษาน้ำหนักและรูปแบบการใช้ชีวิตที่ดีต่อไป', color: '#2ecc71' };
+        if (bmi < 25) return { category: 'น้ำหนักเกิน (ท้วม)', advice: 'ควรควบคุมอาหารและเพิ่มการออกกำลังกายเพื่อลดความเสี่ยงต่อโรค', color: '#f39c12' };
+        if (bmi < 30) return { category: 'โรคอ้วนระดับที่ 1', advice: 'มีความเสี่ยงต่อโรคเบาหวานและความดันโลหิตสูง ควรปรึกษาแพทย์หรือนักโภชนาการ', color: '#e67e22' };
+        return { category: 'โรคอ้วนระดับที่ 2', advice: 'มีความเสี่ยงสูงต่อโรคต่างๆ ควรปรึกษาแพทย์เพื่อรับการดูแลอย่างใกล้ชิด', color: '#c0392b' };
     }
 
+    // --- Exercise Data ---
+    const exerciseData = [
+        { id: 'ex01', name: 'เดินเร็ว', type: 'cardio', description: 'การเดินเร็วเป็นประจำช่วยเสริมสร้างความแข็งแรงของหัวใจและหลอดเลือด', details: 'เดินเร็ว 30-45 นาที 3-5 วันต่อสัปดาห์' },
+        { id: 'ex02', name: 'โยคะ', type: 'flexibility', description: 'โยคะช่วยเพิ่มความยืดหยุ่นของร่างกาย ลดความเครียด และสร้างสมาธิ', details: 'ฝึกโยคะ 20-30 นาที 2-3 วันต่อสัปดาห์' },
+        { id: 'ex03', name: 'ยกน้ำหนัก', type: 'strength', description: 'การยกน้ำหนักช่วยสร้างกล้ามเนื้อและเพิ่มการเผาผลาญของร่างกาย', details: 'เริ่มต้นด้วยน้ำหนักเบาๆ และปรึกษาผู้เชี่ยวชาญเพื่อท่าที่ถูกต้อง' },
+        { id: 'ex04', name: 'ว่ายน้ำ', type: 'cardio', description: 'การว่ายน้ำเป็นการออกกำลังกายที่ดีเยี่ยม ได้บริหารทุกส่วนของร่างกายและมีแรงกระแทกต่ำ', details: 'ว่ายน้ำ 30 นาที 2-3 ครั้งต่อสัปดาห์' }
+    ];
+
+    // --- Exercise Page ---
     function renderExercisePage() {
-        const filtersHtml = exerciseTypes.map(type => `<button class="button-secondary" data-type="${type.type}">${type.name}</button>`).join('');
         return `
             <div class="page-header">
                 <h2><i class="fas fa-dumbbell"></i> แนะนำการออกกำลังกาย</h2>
                 <p>เลือกประเภทการออกกำลังกายที่คุณสนใจ</p>
             </div>
-            <div id="exercise-filters">${filtersHtml}</div>
-            <div id="exercise-list" class="exercise-grid"></div>`;
+            <div id="exercise-content"></div>
+        `;
     }
 
     async function addExercisePageEventListeners() {
-        const filtersContainer = document.getElementById('exercise-filters');
-        const listContainer = document.getElementById('exercise-list');
-        
+        const contentEl = document.getElementById('exercise-content');
+        const filterBtns = document.querySelectorAll('.exercise-filter-btn');
+
         function renderList(filter = 'all') {
             const filteredData = filter === 'all' ? exerciseData : exerciseData.filter(ex => ex.type === filter);
-            if (filteredData.length === 0) {
-                listContainer.innerHTML = '<p>ไม่พบข้อมูลการออกกำลังกายในประเภทนี้</p>';
-                return;
-            }
-            const listHtml = filteredData.map(ex => `
-                <div class="exercise-card card" data-id="${ex.id}">
-                    <div class="card-content">
-                        <h3>${ex.name}</h3>
-                        <div class="card-details">
-                            <span><i class="fas fa-tag"></i> ${exerciseTypes.find(t => t.type === ex.type)?.name || ''}</span>
-                            <span><i class="fas fa-clock"></i> ${ex.duration}</span>
+            contentEl.innerHTML = `
+                <div class="exercise-list">
+                    ${filteredData.map(ex => `
+                        <div class="exercise-card" data-id="${ex.id}">
+                            <h4>${ex.name}</h4>
+                            <p>${ex.description}</p>
                         </div>
-                    </div>
+                    `).join('')}
                 </div>
-            `).join('');
-            listContainer.innerHTML = listHtml;
-
+            `;
             document.querySelectorAll('.exercise-card').forEach(card => {
                 card.addEventListener('click', () => {
-                    const exercise = exerciseData.find(ex => ex.id === parseInt(card.dataset.id));
-                    if (exercise) renderExerciseDetail(exercise);
+                    const exercise = exerciseData.find(ex => ex.id === card.dataset.id);
+                    renderExerciseDetail(exercise);
                 });
             });
         }
 
         function renderExerciseDetail(exercise) {
-            const detailHtml = `
-                <div class="page-header">
-                    <button class="btn-back" id="back-to-exercise-list"><i class="fas fa-arrow-left"></i> กลับไปที่รายการ</button>
-                    <h2>${exercise.name}</h2>
-                </div>
-                <div class="exercise-detail-content card">
-                    <h3><i class="fas fa-bullseye"></i> ประโยชน์</h3>
-                    <p>${exercise.benefits}</p>
-                    <h3><i class="fas fa-walking"></i> ขั้นตอนการปฏิบัติ</h3>
-                    <ol>${exercise.steps.map(step => `<li>${step}</li>`).join('')}</ol>
+            contentEl.innerHTML = `
+                <div class="exercise-detail">
+                    <button id="back-to-list" class="btn-back"><i class="fas fa-arrow-left"></i> กลับไปรายการ</button>
+                    <h3>${exercise.name}</h3>
+                    <p><strong>ประเภท:</strong> ${exercise.type}</p>
+                    <p><strong>คำอธิบาย:</strong> ${exercise.description}</p>
+                    <p><strong>รายละเอียดเพิ่มเติม:</strong> ${exercise.details}</p>
                 </div>
             `;
-            contentContainer.innerHTML = detailHtml;
-            document.getElementById('back-to-exercise-list').addEventListener('click', () => loadPage('exercise-recommendations'));
+            document.getElementById('back-to-list').addEventListener('click', () => renderList());
         }
-
-        filtersContainer.addEventListener('click', (e) => {
-            if (e.target.tagName === 'BUTTON') {
-                document.querySelectorAll('#exercise-filters button').forEach(btn => btn.classList.remove('active'));
-                e.target.classList.add('active');
-                renderList(e.target.dataset.type);
-            }
+        
+        filterBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                filterBtns.forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                renderList(btn.dataset.filter);
+            });
         });
 
-        renderList('all'); // Initial render
-        filtersContainer.querySelector('button[data-type="all"]')?.classList.add('active');
+        renderList();
     }
+    
+    // --- Food Data ---
+    const foodData = [
+        { id: 'f01', name: 'ข้าวกล้อง', group: 'carbs', benefit: 'มีใยอาหารสูง ช่วยควบคุมระดับน้ำตาลในเลือดได้ดีกว่าข้าวขาว' },
+        { id: 'f02', name: 'ปลาแซลมอน', group: 'protein', benefit: 'เป็นแหล่งของโปรตีนและกรดไขมันโอเมก้า 3 ที่ดีต่อสุขภาพหัวใจ' },
+        { id: 'f03', name: 'บรอกโคลี', group: 'vegetable', benefit: 'อุดมไปด้วยวิตามินและแร่ธาตุ ช่วยต้านอนุมูลอิสระ' },
+        { id: 'f04', name: 'อะโวคาโด', group: 'fat', benefit: 'เป็นแหล่งไขมันดี (HDL) ช่วยลดไขมันเลว (LDL) ในร่างกาย' },
+        { id: 'f05', name: 'อกไก่', group: 'protein', benefit: 'โปรตีนสูง ไขมันต่ำ เหมาะสำหรับสร้างกล้ามเนื้อและควบคุมน้ำหนัก' }
+    ];
 
+    // --- Food Page ---
     function renderFoodPage() {
         return `
             <div class="page-header">
-                <h2><i class="fas fa-utensils"></i> แนะนำอาหาร</h2>
-                <p>ตัวอย่างแผนอาหารเพื่อสุขภาพใน 1 สัปดาห์</p>
+                <h2><i class="fas fa-utensils"></i> แนะนำอาหารเพื่อสุขภาพ</h2>
             </div>
-            <div class="food-plan-header">
-                <p>แผนอาหารนี้เป็นเพียงตัวอย่าง ควรปรับเปลี่ยนให้เหมาะสมกับความต้องการและข้อจำกัดของแต่ละบุคคล</p>
-            </div>
-            <div id="food-plan-container" class="food-plan-grid"></div>
+            <div id="food-list-container"></div>
         `;
     }
 
     async function addFoodPageEventListeners() {
-        const container = document.getElementById('food-plan-container');
-        const planHtml = foodData.map(day => `
-            <div class="day-card card">
-                <h4>${day.day}</h4>
-                <div class="meal">
-                    <span class="meal-type">เช้า:</span>
-                    <p>${day.meals.breakfast}</p>
-                </div>
-                <div class="meal">
-                    <span class="meal-type">กลางวัน:</span>
-                    <p>${day.meals.lunch}</p>
-                </div>
-                <div class="meal">
-                    <span class="meal-type">เย็น:</span>
-                    <p>${day.meals.dinner}</p>
-                </div>
+        const container = document.getElementById('food-list-container');
+        if (!container) return;
+        
+        container.innerHTML = foodData.map(food => `
+            <div class="food-card">
+                <h3>${food.name}</h3>
+                <p><strong>กลุ่ม:</strong> ${food.group}</p>
+                <p><strong>ประโยชน์:</strong> ${food.benefit}</p>
             </div>
         `).join('');
-        container.innerHTML = planHtml;
     }
 
+    // --- Tracking Record Page ---
     function renderTrackingRecordPage() {
         return `
             <div class="page-header">
@@ -620,17 +611,21 @@ document.addEventListener('DOMContentLoaded', () => {
         const newsContainer = document.getElementById('news-feed-container');
         if (!newsContainer) return;
 
-        // Switched to a more reliable proxy
         const rssUrl = 'https://www.who.int/rss-feeds/news-english.xml';
-        const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(rssUrl)}`;
+        // Using a more robust proxy: cors.sh
+        const proxyUrl = `https://cors.sh/${rssUrl}`;
         
         try {
-            const response = await fetch(proxyUrl);
+            const response = await fetch(proxyUrl, {
+                headers: {
+                    // cors.sh might require an origin header to be present
+                    'x-origin': window.location.origin 
+                }
+            });
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
-            const data = await response.json();
-            const str = data.contents; // allorigins wraps the response in a 'contents' property
+            const str = await response.text();
             const xml = new window.DOMParser().parseFromString(str, "text/xml");
             const items = xml.querySelectorAll("item");
             
@@ -662,6 +657,77 @@ document.addEventListener('DOMContentLoaded', () => {
                 newsContainer.innerHTML = `<p>ขออภัย, ไม่สามารถโหลดข่าวสารได้ในขณะนี้ กรุณาลองใหม่ในภายหลัง</p>`;
             }
         }
+    }
+
+    // --- Database Functions (IndexedDB) ---
+    const DB_NAME = 'NCDsHealthTechDB';
+    function openDB() {
+        return new Promise((resolve, reject) => {
+            const request = indexedDB.open(DB_NAME, 2); // Version 2 for BMI table
+            request.onerror = (event) => reject('Database error: ' + event.target.errorCode);
+            request.onupgradeneeded = (event) => {
+                const db = event.target.result;
+                if (!db.objectStoreNames.contains('userProfile')) {
+                    db.createObjectStore('userProfile', { keyPath: 'username' });
+                }
+                if (!db.objectStoreNames.contains('healthProfile')) {
+                    db.createObjectStore('healthProfile', { keyPath: 'username' });
+                }
+                if (!db.objectStoreNames.contains('trackingRecords')) {
+                    db.createObjectStore('trackingRecords', { keyPath: 'id', autoIncrement: true });
+                }
+                if (!db.objectStoreNames.contains('bmiRecords')) { // New table for BMI
+                    db.createObjectStore('bmiRecords', { keyPath: 'username' });
+                }
+            };
+            request.onsuccess = (event) => {
+                console.log("Database opened successfully.");
+                resolve(event.target.result);
+            };
+        });
+    }
+
+    async function DBGet(storeName, key) {
+        const db = await openDB();
+        const transaction = db.transaction(storeName, 'readonly');
+        const store = transaction.objectStore(storeName);
+        const request = store.get(key);
+        return new Promise((resolve, reject) => {
+            request.onerror = () => reject('Error getting data');
+            request.onsuccess = () => {
+                if (request.result) {
+                    resolve(request.result);
+                } else {
+                    reject('Data not found');
+                }
+            };
+        });
+    }
+
+    async function DBPut(storeName, data) {
+        const db = await openDB();
+        const transaction = db.transaction(storeName, 'readwrite');
+        const store = transaction.objectStore(storeName);
+        const request = store.put(data);
+        return new Promise((resolve, reject) => {
+            request.onerror = () => reject('Error saving data');
+            request.onsuccess = () => resolve('Data saved successfully');
+        });
+    }
+
+    async function DBGetAll(storeName) {
+        const db = await openDB();
+        const transaction = db.transaction(storeName, 'readonly');
+        const store = transaction.objectStore(storeName);
+        const request = store.getAll();
+        return new Promise((resolve, reject) => {
+            const result = [];
+            request.onerror = () => reject('Error getting data');
+            request.onsuccess = () => {
+                request.result.forEach(item => result.push(item));
+                resolve(result);
+            };
+        });
     }
 
     // --- Init ---
