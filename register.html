@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ลงทะเบียน - SICU1 NCDs HealthTech</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div class="auth-container">
+        <div class="auth-box">
+            <div class="auth-header">
+                <img src="https://www.smpkh.go.th/images/logo_smpk.png" alt="Logo" class="auth-logo">
+                <h1>สร้างบัญชีใหม่</h1>
+                <p>กรอกข้อมูลเพื่อลงทะเบียน</p>
+            </div>
+            <form id="register-form">
+                <div class="input-group">
+                    <i class="fas fa-user-plus"></i>
+                    <input type="text" id="firstName" placeholder="ชื่อจริง" required>
+                </div>
+                 <div class="input-group">
+                    <i class="fas fa-user-plus"></i>
+                    <input type="text" id="lastName" placeholder="นามสกุล" required>
+                </div>
+                <div class="input-group">
+                    <i class="fas fa-user"></i>
+                    <input type="text" id="username" placeholder="ชื่อผู้ใช้" required>
+                </div>
+                <div class="input-group">
+                    <i class="fas fa-lock"></i>
+                    <input type="password" id="password" placeholder="รหัสผ่าน" required>
+                </div>
+                <button type="submit" class="auth-button">ลงทะเบียน</button>
+            </form>
+            <div class="auth-footer">
+                <p>มีบัญชีอยู่แล้ว? <a href="login.html">เข้าสู่ระบบที่นี่</a></p>
+            </div>
+        </div>
+    </div>
+    <script src="js/db.js"></script>
+    <script src="js/auth.js"></script>
+</body>
+</html> 

@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>หน้าหลัก - SICU1 NCDs HealthTech</title>
+    <link rel="manifest" href="manifest.json">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div class="app-container">
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <h2>SICU1 NCDs</h2>
+                <button class="close-btn"><i class="fas fa-times"></i></button>
+            </div>
+            <nav class="sidebar-nav">
+                <ul>
+                    <li><a href="#" class="nav-link active" data-page="home"><i class="fas fa-home"></i> <span>หน้าหลัก</span></a></li>
+                    <li><a href="#" class="nav-link" data-page="ncds-list"><i class="fas fa-book-medical"></i> <span>NCDs</span></a></li>
+                    <li><a href="#" class="nav-link" data-page="health-data"><i class="fas fa-heart-pulse"></i> <span>ข้อมูลสุขภาพ</span></a></li>
+                    <li><a href="#" class="nav-link" data-page="bmi-calculator"><i class="fas fa-calculator"></i> <span>คำนวณ BMI</span></a></li>
+                    <li><a href="#" class="nav-link" data-page="exercise-recommendations"><i class="fas fa-dumbbell"></i> <span>แนะนำการออกกำลังกาย</span></a></li>
+                    <li><a href="#" class="nav-link" data-page="food-recommendations"><i class="fas fa-utensils"></i> <span>แนะนำอาหาร</span></a></li>
+                    <li><a href="#" class="nav-link" data-page="tracking-record"><i class="fas fa-chart-line"></i> <span>บันทึกการเปลี่ยนแปลง</span></a></li>
+                    <li><a href="#" class="nav-link" data-page="emergency"><i class="fas fa-phone-volume"></i> <span>เบอร์โทรฉุกเฉิน</span></a></li>
+                    <li><a href="#" id="logout-btn"><i class="fas fa-sign-out-alt"></i> <span>ออกจากระบบ</span></a></li>
+                </ul>
+            </nav>
+        </aside>
+
+        <main class="main-content">
+            <header class="main-header">
+                <button class="menu-toggle-btn"><i class="fas fa-bars"></i></button>
+                <div class="user-profile">
+                    <div class="profile-info">
+                        <span id="user-greeting">สวัสดี, </span>
+                        <span id="current-date"></span>
+                    </div>
+                    <div class="profile-pic-container">
+                        <img src="https://via.placeholder.com/50" alt="Profile Picture" id="profile-pic">
+                        <input type="file" id="profile-pic-upload" accept="image/*" style="display: none;">
+                    </div>
+                </div>
+            </header>
+
+            <div class="page-content" id="page-content">
+                <!-- Content will be loaded here by JavaScript -->
+            </div>
+        </main>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="js/db.js"></script>
+    <script src="js/NCDsData.js"></script>
+    <script src="js/exerciseData.js"></script>
+    <script src="js/foodData.js"></script>
+    <script src="js/emergencyData.js"></script>
+    <script src="js/main.js"></script>
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/sw.js')
+                    .then(registration => {
+                        console.log('ServiceWorker registration successful with scope: ', registration.scope);
+                    })
+                    .catch(error => {
+                        console.log('ServiceWorker registration failed: ', error);
+                    });
+            });
+        }
+    </script>
+</body>
+</html> 
