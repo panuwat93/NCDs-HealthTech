@@ -578,28 +578,32 @@ document.addEventListener('DOMContentLoaded', () => {
 
         newsContainer.innerHTML = `<p class="loading-news">กำลังโหลดข่าวสารล่าสุด...</p>`;
 
-        const apiKey = 'e7952dfcea5a45ce99e6917535e9211f';
-        const url = `https://newsapi.org/v2/top-headlines?country=th&category=health&apiKey=${apiKey}`;
+        // Switched to a more reliable, open source (WHO RSS Feed) via a proxy to avoid CORS issues on deployment
+        const RSS_URL = 'https://www.who.int/rss-feeds/news-rss.xml';
+        const API_URL = `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(RSS_URL)}`;
 
         try {
-            const response = await fetch(url);
+            const response = await fetch(API_URL);
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
             const data = await response.json();
 
-            if (data.articles && data.articles.length > 0) {
-                const newsHtml = data.articles.slice(0, 5).map(article => `
+            if (data && data.status === 'ok' && data.items) {
+                const articles = data.items.slice(0, 5); // Get latest 5 articles
+                let articlesHtml = articles.map(article => {
+                    const description = (article.description || '').replace(/<[^>]*>/g, "").substring(0, 150);
+                    return `
                     <div class="news-article">
-                        <h4><a href="${article.url}" target="_blank" rel="noopener noreferrer">${article.title}</a></h4>
-                        <p class="news-description">${article.description || 'ไม่มีคำอธิบาย'}</p>
+                        <h4><a href="${article.link}" target="_blank" rel="noopener noreferrer">${article.title}</a></h4>
+                        <p class="news-description">${description}...</p>
                         <div class="news-footer">
-                            <span>${article.source.name}</span>
-                            <span>${new Date(article.publishedAt).toLocaleDateString('th-TH')}</span>
+                            <span>${new Date(article.pubDate).toLocaleDateString('th-TH', { day: 'numeric', month: 'long', year: 'numeric' })}</span>
+                            <a href="${article.link}" target="_blank" rel="noopener noreferrer" class="read-more">อ่านต่อ <i class="fas fa-arrow-right"></i></a>
                         </div>
                     </div>
-                `).join('');
-                newsContainer.innerHTML = newsHtml;
+                `}).join('');
+                newsContainer.innerHTML = articlesHtml;
             } else {
                 newsContainer.innerHTML = `<p>ไม่พบข่าวสารในขณะนี้</p>`;
             }
