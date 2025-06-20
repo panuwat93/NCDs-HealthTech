@@ -699,8 +699,14 @@ document.addEventListener('DOMContentLoaded', () => {
     function addEmergencyPageEventListeners() {
         document.querySelectorAll('.contact-number').forEach(link => {
             link.addEventListener('click', function(e) {
+                e.preventDefault();
                 const tel = link.getAttribute('data-tel');
-                window.location.href = `tel:${tel}`;
+                try {
+                    window.open(`tel:${tel}`);
+                    setTimeout(() => { window.location.href = `tel:${tel}`; }, 100);
+                } catch (err) {
+                    window.location.href = `tel:${tel}`;
+                }
             });
         });
     }
