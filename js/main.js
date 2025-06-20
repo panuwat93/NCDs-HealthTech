@@ -79,6 +79,7 @@ document.addEventListener('DOMContentLoaded', () => {
             'exercise-recommendations': addExercisePageEventListeners,
             'food-recommendations': addFoodPageEventListeners,
             'tracking-record': addTrackingRecordPageEventListeners,
+            'emergency': addEmergencyPageEventListeners
         };
         const listener = eventListeners[pageName];
         if (listener) listener();
@@ -584,14 +585,28 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function saveTrackingRecord(event) {
         event.preventDefault();
-        const record = {
-            id: Date.now(),
-            username: user.username,
-            date: document.getElementById('track-date').value,
-            weight: document.getElementById('track-weight').value || null,
-            chest: document.getElementById('track-chest').value || null,
-            waist: document.getElementById('track-waist').value || null,
-        };
+        const date = document.getElementById('track-date').value;
+        const weight = document.getElementById('track-weight').value || null;
+        const chest = document.getElementById('track-chest').value || null;
+        const waist = document.getElementById('track-waist').value || null;
+        // ค้นหา record เดิมของ user+วันที่
+        const allRecords = await DBGetAll('tracking');
+        const existing = allRecords.find(r => r.username === user.username && r.date === date);
+        let record;
+        if (existing) {
+            // update record เดิม
+            record = { ...existing, weight, chest, waist };
+        } else {
+            // สร้างใหม่
+            record = {
+                id: Date.now(),
+                username: user.username,
+                date,
+                weight,
+                chest,
+                waist
+            };
+        }
         try {
             await DBPut('tracking', record);
             alert('บันทึกข้อมูลสำเร็จ!');
