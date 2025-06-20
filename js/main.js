@@ -781,8 +781,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (!db.objectStoreNames.contains('healthProfile')) {
                     db.createObjectStore('healthProfile', { keyPath: 'username' });
                 }
-                if (!db.objectStoreNames.contains('trackingRecords')) {
-                    db.createObjectStore('trackingRecords', { keyPath: 'id', autoIncrement: true });
+                if (!db.objectStoreNames.contains('tracking')) {
+                    db.createObjectStore('tracking', { keyPath: 'id' });
                 }
                 if (!db.objectStoreNames.contains('bmiRecords')) { 
                     db.createObjectStore('bmiRecords', { keyPath: 'username' });
