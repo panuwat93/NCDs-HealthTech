@@ -528,7 +528,7 @@ document.addEventListener('DOMContentLoaded', () => {
         return `
             <div class="page-header">
                 <h2><i class="fas fa-chart-line"></i> บันทึกการเปลี่ยนแปลง</h2>
-                <p>บันทึกและติดตามข้อมูลสุขภาพของคุณ เช่น น้ำหนัก ส่วนสูง ความดันโลหิต และระดับน้ำตาลในเลือด</p>
+                <p>บันทึกและติดตามข้อมูลสุขภาพของคุณ เช่น น้ำหนัก รอบอก รอบเอว</p>
             </div>
             <div class="tracking-grid">
                 <div class="form-container-grid form-card card">
@@ -543,16 +543,12 @@ document.addEventListener('DOMContentLoaded', () => {
                             <input type="number" step="0.1" id="track-weight">
                         </div>
                         <div class="input-group">
-                            <label for="track-height">ส่วนสูง (cm)</label>
-                            <input type="number" step="0.1" id="track-height">
+                            <label for="track-chest">รอบอก (cm)</label>
+                            <input type="number" step="0.1" id="track-chest">
                         </div>
                         <div class="input-group">
-                            <label for="track-bp">ความดันโลหิต (เช่น 120/80)</label>
-                            <input type="text" id="track-bp" placeholder="ค่าบน/ค่าล่าง">
-                        </div>
-                        <div class="input-group">
-                            <label for="track-glucose">ระดับน้ำตาลในเลือด (mg/dL)</label>
-                            <input type="number" id="track-glucose">
+                            <label for="track-waist">รอบเอว (cm)</label>
+                            <input type="number" step="0.1" id="track-waist">
                         </div>
                         <button type="submit" class="button-primary">บันทึก</button>
                     </form>
@@ -562,8 +558,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     <div class="chart-controls">
                         <select id="chart-type">
                             <option value="weight">น้ำหนัก</option>
-                            <option value="bp">ความดันโลหิต</option>
-                            <option value="glucose">ระดับน้ำตาล</option>
+                            <option value="chest">รอบอก</option>
+                            <option value="waist">รอบเอว</option>
                         </select>
                     </div>
                     <canvas id="tracking-chart"></canvas>
@@ -593,16 +589,9 @@ document.addEventListener('DOMContentLoaded', () => {
             username: user.username,
             date: document.getElementById('track-date').value,
             weight: document.getElementById('track-weight').value || null,
-            height: document.getElementById('track-height').value || null,
-            bp: document.getElementById('track-bp').value || null,
-            glucose: document.getElementById('track-glucose').value || null,
+            chest: document.getElementById('track-chest').value || null,
+            waist: document.getElementById('track-waist').value || null,
         };
-
-        if (record.bp && !/^\d{2,3}\/\d{2,3}$/.test(record.bp)) {
-            alert('รูปแบบความดันโลหิตไม่ถูกต้อง กรุณใช้รูปแบบ "ค่าบน/ค่าล่าง" เช่น 120/80');
-            return;
-        }
-
         try {
             await DBPut('tracking', record);
             alert('บันทึกข้อมูลสำเร็จ!');
@@ -645,26 +634,21 @@ document.addEventListener('DOMContentLoaded', () => {
                     fill: false
                 });
                 break;
-            case 'bp':
-                chartConfig.data.labels = trackingData.filter(d => d.bp).map(d => d.date);
+            case 'chest':
+                chartConfig.data.labels = trackingData.map(d => d.date);
                 chartConfig.data.datasets.push({
-                    label: 'ความดัน (ตัวบน)',
-                    data: trackingData.filter(d => d.bp).map(d => d.bp.split('/')[0]),
-                    borderColor: '#e74c3c',
-                    fill: false
-                }, {
-                    label: 'ความดัน (ตัวล่าง)',
-                    data: trackingData.filter(d => d.bp).map(d => d.bp.split('/')[1]),
-                    borderColor: '#f1c40f',
+                    label: 'รอบอก (cm)',
+                    data: trackingData.map(d => d.chest),
+                    borderColor: '#e67e22',
                     fill: false
                 });
                 break;
-            case 'glucose':
-                chartConfig.data.labels = trackingData.filter(d => d.glucose).map(d => d.date);
+            case 'waist':
+                chartConfig.data.labels = trackingData.map(d => d.date);
                 chartConfig.data.datasets.push({
-                    label: 'ระดับน้ำตาล (mg/dL)',
-                    data: trackingData.filter(d => d.glucose).map(d => d.glucose),
-                    borderColor: '#2ecc71',
+                    label: 'รอบเอว (cm)',
+                    data: trackingData.map(d => d.waist),
+                    borderColor: '#c0392b',
                     fill: false
                 });
                 break;
@@ -678,9 +662,9 @@ document.addEventListener('DOMContentLoaded', () => {
             alert('ไม่มีข้อมูลสำหรับส่งออก');
             return;
         }
-        let csvContent = "data:text/csv;charset=utf-8,Date,Weight (kg),Height (cm),Blood Pressure,Glucose (mg/dL)\n";
+        let csvContent = "data:text/csv;charset=utf-8,Date,Weight (kg),Chest (cm),Waist (cm)\n";
         trackingData.forEach(row => {
-            csvContent += `${row.date},${row.weight || ''},${row.height || ''},"${row.bp || ''}",${row.glucose || ''}\n`;
+            csvContent += `${row.date},${row.weight || ''},${row.chest || ''},${row.waist || ''}\n`;
         });
         const encodedUri = encodeURI(csvContent);
         const link = document.createElement("a");
@@ -698,7 +682,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 <i class="${contact.icon}"></i>
                 <div class="contact-info">
                     <span class="contact-name">${contact.name}</span>
-                    <a href="tel:${contact.phone}" class="contact-number" title="คลิกเพื่อโทรออก">
+                    <a href="tel:${contact.phone}" class="contact-number" title="คลิกเพื่อโทรออก" data-tel="${contact.phone}">
                         <i class="fas fa-phone"></i> ${contact.phone}
                     </a>
                 </div>
@@ -710,6 +694,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 <p>เบอร์โทรศัพท์ที่สำคัญสำหรับเหตุการณ์ฉุกเฉิน <br><span class="emergency-instruction">(คลิกที่เบอร์เพื่อโทรออก)</span></p>
             </div>
             <div class="emergency-list">${listHtml}</div>`;
+    }
+
+    function addEmergencyPageEventListeners() {
+        document.querySelectorAll('.contact-number').forEach(link => {
+            link.addEventListener('click', function(e) {
+                const tel = link.getAttribute('data-tel');
+                window.location.href = `tel:${tel}`;
+            });
+        });
     }
 
     function addHomePageEventListeners() {
