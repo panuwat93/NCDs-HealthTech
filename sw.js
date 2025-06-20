@@ -1,6 +1,6 @@
 const CACHE_NAME = 'ncds-healthtech-cache-v2';
 const URLS_TO_CACHE = [
-    '/',
+    './',
     'index.html',
     'login.html',
     'register.html',
