@@ -194,9 +194,16 @@ document.addEventListener('DOMContentLoaded', () => {
         const container = document.getElementById('health-form-container');
         try {
             const healthData = await DBGet('healthProfile', user.username);
-            renderHealthDataView(container, healthData);
+            // If data exists, render view. Otherwise, render the edit form directly.
+            if (healthData) {
+                renderHealthDataView(container, healthData);
+            } else {
+                renderHealthDataEdit(container, {});
+            }
         } catch (error) {
-            container.innerHTML = `<p>เกิดข้อผิดพลาดในการโหลดข้อมูล</p>`;
+            console.error("Error loading health data, showing edit form.", error);
+            // If any error occurs, default to showing the edit form.
+            renderHealthDataEdit(container, {});
         }
     }
 
@@ -310,12 +317,85 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function getBMIDetails(bmi) {
-        if (bmi < 18.5) return { category: 'น้ำหนักน้อยกว่าเกณฑ์', advice: 'ควรรับประทานอาหารที่มีประโยชน์และออกกำลังกายเพื่อเสริมสร้างกล้ามเนื้อ', color: '#3498db' };
-        if (bmi < 23) return { category: 'น้ำหนักปกติ', advice: 'เยี่ยมมาก! รักษาน้ำหนักและรูปแบบการใช้ชีวิตที่ดีต่อไป', color: '#2ecc71' };
-        if (bmi < 25) return { category: 'น้ำหนักเกิน (ท้วม)', advice: 'ควรควบคุมอาหารและเพิ่มการออกกำลังกายเพื่อลดความเสี่ยงต่อโรค', color: '#f39c12' };
-        if (bmi < 30) return { category: 'โรคอ้วนระดับที่ 1', advice: 'มีความเสี่ยงต่อโรคเบาหวานและความดันโลหิตสูง ควรปรึกษาแพทย์หรือนักโภชนาการ', color: '#e67e22' };
-        return { category: 'โรคอ้วนระดับที่ 2', advice: 'มีความเสี่ยงสูงต่อโรคต่างๆ ควรปรึกษาแพทย์เพื่อรับการดูแลอย่างใกล้ชิด', color: '#c0392b' };
+        if (bmi < 18.5) return { key: 'underweight', category: 'น้ำหนักน้อยกว่าเกณฑ์', advice: 'ควรรับประทานอาหารที่มีประโยชน์และออกกำลังกายเพื่อเสริมสร้างกล้ามเนื้อ', color: '#3498db' };
+        if (bmi < 23) return { key: 'normal', category: 'น้ำหนักปกติ', advice: 'เยี่ยมมาก! รักษาน้ำหนักและรูปแบบการใช้ชีวิตที่ดีต่อไป', color: '#2ecc71' };
+        if (bmi < 25) return { key: 'overweight', category: 'น้ำหนักเกิน (ท้วม)', advice: 'ควรควบคุมอาหารและเพิ่มการออกกำลังกายเพื่อลดความเสี่ยงต่อโรค', color: '#f39c12' };
+        if (bmi < 30) return { key: 'obese1', category: 'โรคอ้วนระดับที่ 1', advice: 'มีความเสี่ยงต่อโรคเบาหวานและความดันโลหิตสูง ควรปรึกษาแพทย์หรือนักโภชนาการ', color: '#e67e22' };
+        return { key: 'obese2', category: 'โรคอ้วนระดับที่ 2', advice: 'มีความเสี่ยงสูงต่อโรคต่างๆ ควรปรึกษาแพทย์เพื่อรับการดูแลอย่างใกล้ชิด', color: '#c0392b' };
     }
+
+    // --- BMI Dependent Recommendations Data ---
+
+    const exerciseRecommendationsByBMI = {
+        underweight: ['ex03', 'ex02'],
+        normal: ['ex01', 'ex02', 'ex03', 'ex04'],
+        overweight: ['ex01', 'ex04', 'ex02'],
+        obese1: ['ex01', 'ex04'],
+        obese2: ['ex01', 'ex04']
+    };
+
+    const foodPlansByBMI = {
+        underweight: {
+            name: 'แผนเพิ่มน้ำหนักอย่างมีคุณภาพ',
+            meals: [
+                { day: 'จันทร์', breakfast: 'ข้าวต้มปลา + ไข่ลวก 2 ฟอง', lunch: 'ข้าว + แกงจืดเต้าหู้หมูสับ + ผลไม้', dinner: 'สเต็กไก่ + สลัดผัก' },
+                { day: 'อังคาร', breakfast: 'โจ๊กหมูใส่ไข่', lunch: 'ก๋วยเตี๋ยวไก่ + เพิ่มเนื้อ', dinner: 'ข้าว + ผัดผักรวมมิตรใส่ไก่' },
+                { day: 'พุธ', breakfast: 'แซนด์วิชทูน่าโฮลวีท', lunch: 'ข้าวผัดหมู + ไข่ดาว', dinner: 'ข้าว + ต้มยำปลา' },
+                { day: 'พฤหัสบดี', breakfast: 'นม + กล้วยหอม + ขนมปังโฮลวีท', lunch: 'ข้าว + พะแนงไก่ + ผัดบรอกโคลี', dinner: 'สุกี้น้ำ' },
+                { day: 'ศุกร์', breakfast: 'ข้าวเหนียวหมูปิ้ง', lunch: 'ข้าวราดแกงกะหรี่ไก่', dinner: 'ข้าว + แกงส้มชะอมไข่' },
+                { day: 'เสาร์', breakfast: 'ไข่กระทะ', lunch: 'ข้าวมันไก่ (เลี่ยงหนัง)', dinner: 'ปลาเผา + ผักสด' },
+                { day: 'อาทิตย์', breakfast: 'ซีเรียลโฮลเกรน + นม + ผลไม้', lunch: 'อาหารตามสั่ง (เลือกเมนูผัด/ต้ม)', dinner: 'หมูกระทะ (เน้นผักและเนื้อไม่ติดมัน)' }
+            ]
+        },
+        normal: {
+            name: 'แผนรักษาสมดุลสุขภาพดี',
+            meals: [
+                { day: 'จันทร์', breakfast: 'ข้าวกล้อง + ต้มเลือดหมู', lunch: 'สลัดอกไก่ + ธัญพืช', dinner: 'ข้าวกล้าย + แกงจืดวุ้นเส้น' },
+                { day: 'อังคาร', breakfast: 'โยเกิร์ต + ผลไม้รวม', lunch: 'ข้าว + ผัดกะเพราไก่ (น้ำมันน้อย)', dinner: 'สเต็กปลา + มันบด' },
+                { day: 'พุธ', breakfast: 'ขนมปังโฮลวีท + อะโวคาโด', lunch: 'ก๋วยเตี๋ยวลุยสวน', dinner: 'ข้าว + ต้มจับฉ่าย' },
+                { day: 'พฤหัสบดี', breakfast: 'น้ำเต้าหู้ไม่หวาน + ปาท่องโก๋ 2 ตัว', lunch: 'ข้าว + ไก่ผัดขิง', dinner: 'ยำวุ้นเส้น' },
+                { day: 'ศุกร์', breakfast: 'ข้าวต้มปลา', lunch: 'ส้มตำไก่ย่าง (เลี่ยงหนัง)', dinner: 'แกงเลียงกุ้งสด' },
+                { day: 'เสาร์', breakfast: 'ไข่ต้ม 2 ฟอง + สลัดผัก', lunch: 'ข้าวผัดธัญพืช', dinner: 'เมี่ยงปลาทู' },
+                { day: 'อาทิตย์', breakfast: 'แซนด์วิชไข่', lunch: 'เกาเหลา + ข้าวสวย', dinner: 'อาหารคลีนตามชอบ' }
+            ]
+        },
+        overweight: {
+            name: 'แผนควบคุมน้ำหนัก ลดความเสี่ยง',
+            meals: [
+                { day: 'จันทร์', breakfast: 'โยเกิร์ตไขมันต่ำ + กราโนล่า', lunch: 'เกาเหลา ไม่ใส่กระเทียมเจียว', dinner: 'สลัดผัก 5 สี + ไข่ต้ม 1 ฟอง' },
+                { day: 'อังคาร', breakfast: 'น้ำเต้าหู้ไม่หวาน', lunch: 'ข้าวกล้อง + ต้มยำเห็ด', dinner: 'อกไก่ย่าง + ผักนึ่ง' },
+                { day: 'พุธ', breakfast: 'ขนมปังโฮลวีท 1 แผ่น + เนยถั่ว', lunch: 'สุกี้น้ำไก่', dinner: 'ปลาเผา + น้ำจิ้มซีฟู้ด' },
+                { day: 'พฤหัสบดี', breakfast: 'แอปเปิ้ล 1 ผล', lunch: 'ข้าว + แกงส้มผักรวม', dinner: 'ยำทูน่าในน้ำแร่' },
+                { day: 'ศุกร์', breakfast: 'นมไขมันต่ำ', lunch: 'ก๋วยเตี๋ยวเรือ (เน้นผัก)', dinner: 'สเต็กเต้าหู้ + สลัด' },
+                { day: 'เสาร์', breakfast: 'ไข่ตุ๋น', lunch: 'สลัดโรล', dinner: 'ต้มจืดตำลึงหมูสับ' },
+                { day: 'อาทิตย์', breakfast: 'ฝรั่ง 1 ผล', lunch: 'วุ้นเส้นต้มยำ', dinner: 'น้ำพริกผักต้ม + ปลาทูทอด (ไร้น้ำมัน)' }
+            ]
+        },
+        obese1: { // Same as overweight for simplicity, can be adjusted
+            name: 'แผนลดน้ำหนัก ลดไขมัน',
+            meals: [
+                { day: 'จันทร์', breakfast: 'โยเกิร์ตไขมันต่ำ + กราโนล่า', lunch: 'เกาเหลา ไม่ใส่กระเทียมเจียว', dinner: 'สลัดผัก 5 สี + ไข่ต้ม 1 ฟอง' },
+                { day: 'อังคาร', breakfast: 'น้ำเต้าหู้ไม่หวาน', lunch: 'ข้าวกล้อง + ต้มยำเห็ด', dinner: 'อกไก่ย่าง + ผักนึ่ง' },
+                { day: 'พุธ', breakfast: 'ขนมปังโฮลวีท 1 แผ่น + เนยถั่ว', lunch: 'สุกี้น้ำไก่', dinner: 'ปลาเผา + น้ำจิ้มซีฟู้ด' },
+                { day: 'พฤหัสบดี', breakfast: 'แอปเปิ้ล 1 ผล', lunch: 'ข้าว + แกงส้มผักรวม', dinner: 'ยำทูน่าในน้ำแร่' },
+                { day: 'ศุกร์', breakfast: 'นมไขมันต่ำ', lunch: 'ก๋วยเตี๋ยวเรือ (เน้นผัก)', dinner: 'สเต็กเต้าหู้ + สลัด' },
+                { day: 'เสาร์', breakfast: 'ไข่ตุ๋น', lunch: 'สลัดโรล', dinner: 'ต้มจืดตำลึงหมูสับ' },
+                { day: 'อาทิตย์', breakfast: 'ฝรั่ง 1 ผล', lunch: 'วุ้นเส้นต้มยำ', dinner: 'น้ำพริกผักต้ม + ปลาทูทอด (ไร้น้ำมัน)' }
+            ]
+        },
+        obese2: { // Same as overweight for simplicity, can be adjusted
+            name: 'แผนลดน้ำหนัก (ปรึกษาแพทย์)',
+            meals: [
+                { day: 'จันทร์', breakfast: 'โยเกิร์ตไขมันต่ำ + กราโนล่า', lunch: 'เกาเหลา ไม่ใส่กระเทียมเจียว', dinner: 'สลัดผัก 5 สี + ไข่ต้ม 1 ฟอง' },
+                { day: 'อังคาร', breakfast: 'น้ำเต้าหู้ไม่หวาน', lunch: 'ข้าวกล้อง + ต้มยำเห็ด', dinner: 'อกไก่ย่าง + ผักนึ่ง' },
+                { day: 'พุธ', breakfast: 'ขนมปังโฮลวีท 1 แผ่น + เนยถั่ว', lunch: 'สุกี้น้ำไก่', dinner: 'ปลาเผา + น้ำจิ้มซีฟู้ด' },
+                { day: 'พฤหัสบดี', breakfast: 'แอปเปิ้ล 1 ผล', lunch: 'ข้าว + แกงส้มผักรวม', dinner: 'ยำทูน่าในน้ำแร่' },
+                { day: 'ศุกร์', breakfast: 'นมไขมันต่ำ', lunch: 'ก๋วยเตี๋ยวเรือ (เน้นผัก)', dinner: 'สเต็กเต้าหู้ + สลัด' },
+                { day: 'เสาร์', breakfast: 'ไข่ตุ๋น', lunch: 'สลัดโรล', dinner: 'ต้มจืดตำลึงหมูสับ' },
+                { day: 'อาทิตย์', breakfast: 'ฝรั่ง 1 ผล', lunch: 'วุ้นเส้นต้มยำ', dinner: 'น้ำพริกผักต้ม + ปลาทูทอด (ไร้น้ำมัน)' }
+            ]
+        }
+    };
 
     // --- Exercise Data & Page ---
     const exerciseData = [
@@ -329,48 +409,45 @@ document.addEventListener('DOMContentLoaded', () => {
         return `
             <div class="page-header">
                 <h2><i class="fas fa-dumbbell"></i> แนะนำการออกกำลังกาย</h2>
-                <p>เลือกประเภทการออกกำลังกายที่คุณสนใจ</p>
             </div>
             <div id="exercise-content-container"></div>
         `;
     }
 
-    function addExercisePageEventListeners() {
+    async function addExercisePageEventListeners() {
         const container = document.getElementById('exercise-content-container');
+        const bmiRecord = await DBGet('bmiRecords', user.username);
 
-        function renderList() {
+        if (!bmiRecord) {
             container.innerHTML = `
-                <div class="exercise-list">
-                    ${exerciseData.map(ex => `
-                        <div class="exercise-card" data-id="${ex.id}">
-                            <h4>${ex.name}</h4>
-                            <p>${ex.description}</p>
-                        </div>
-                    `).join('')}
+                <div class="bmi-prompt card">
+                    <h3><i class="fas fa-calculator"></i> กรุณาคำนวณ BMI ก่อน</h3>
+                    <p>เราต้องการค่า BMI ของคุณเพื่อแนะนำโปรแกรมการออกกำลังกายที่เหมาะสม</p>
+                    <button id="go-to-bmi-btn" class="button-primary">ไปที่หน้าคำนวณ BMI</button>
                 </div>
             `;
-            document.querySelectorAll('.exercise-card').forEach(card => {
-                card.addEventListener('click', () => {
-                    const exercise = exerciseData.find(ex => ex.id === card.dataset.id);
-                    renderExerciseDetail(exercise);
-                });
-            });
+            document.getElementById('go-to-bmi-btn').addEventListener('click', () => loadPage('bmi-calculator'));
+            return;
         }
 
-        function renderExerciseDetail(exercise) {
-            container.innerHTML = `
-                <div class="exercise-detail">
-                    <button id="back-to-list" class="btn-back"><i class="fas fa-arrow-left"></i> กลับไปรายการ</button>
-                    <h3>${exercise.name}</h3>
-                    <p><strong>ประเภท:</strong> ${exercise.type}</p>
-                    <p><strong>คำอธิบาย:</strong> ${exercise.description}</p>
-                    <p><strong>รายละเอียดเพิ่มเติม:</strong> ${exercise.details}</p>
-                </div>
-            `;
-            document.getElementById('back-to-list').addEventListener('click', renderList);
-        }
+        const bmiDetails = getBMIDetails(bmiRecord.bmi);
+        const recommendedIds = exerciseRecommendationsByBMI[bmiDetails.key] || [];
+        const recommendedExercises = recommendedIds.map(id => exerciseData.find(ex => ex.id === id));
         
-        renderList();
+        container.innerHTML = `
+            <div class="recommendation-header">
+                <h3>โปรแกรมที่แนะนำสำหรับคุณ (BMI: ${bmiRecord.bmi.toFixed(2)} - ${bmiDetails.category})</h3>
+            </div>
+            <div class="exercise-list">
+                ${recommendedExercises.map(ex => `
+                    <div class="exercise-card">
+                        <h4>${ex.name}</h4>
+                        <p>${ex.description}</p>
+                        <p><strong>คำแนะนำ:</strong> ${ex.details}</p>
+                    </div>
+                `).join('')}
+            </div>
+        `;
     }
     
     // --- Food Data & Page ---
@@ -385,23 +462,65 @@ document.addEventListener('DOMContentLoaded', () => {
     function renderFoodPage() {
         return `
             <div class="page-header">
-                <h2><i class="fas fa-utensils"></i> แนะนำอาหารเพื่อสุขภาพ</h2>
+                <h2><i class="fas fa-utensils"></i> แนะนำตารางอาหาร</h2>
             </div>
-            <div id="food-list-container"></div>
+            <div id="food-plan-container"></div>
         `;
     }
 
-    function addFoodPageEventListeners() {
-        const container = document.getElementById('food-list-container');
-        if (!container) return;
+    async function addFoodPageEventListeners() {
+        const container = document.getElementById('food-plan-container');
+        const bmiRecord = await DBGet('bmiRecords', user.username);
+
+        if (!bmiRecord) {
+            container.innerHTML = `
+                <div class="bmi-prompt card">
+                    <h3><i class="fas fa-calculator"></i> กรุณาคำนวณ BMI ก่อน</h3>
+                    <p>เราต้องการค่า BMI ของคุณเพื่อแนะนำตารางอาหารที่เหมาะสม</p>
+                    <button id="go-to-bmi-btn" class="button-primary">ไปที่หน้าคำนวณ BMI</button>
+                </div>
+            `;
+            document.getElementById('go-to-bmi-btn').addEventListener('click', () => loadPage('bmi-calculator'));
+            return;
+        }
+
+        const bmiDetails = getBMIDetails(bmiRecord.bmi);
+        const plan = foodPlansByBMI[bmiDetails.key];
+
+        if (!plan) {
+            container.innerHTML = '<p>ขออภัย ไม่พบแผนอาหารที่เหมาะสม</p>';
+            return;
+        }
         
-        container.innerHTML = foodData.map(food => `
-            <div class="food-card">
-                <h3>${food.name}</h3>
-                <p><strong>กลุ่ม:</strong> ${food.group}</p>
-                <p><strong>ประโยชน์:</strong> ${food.benefit}</p>
-            </div>
+        const tableRows = plan.meals.map(day => `
+            <tr>
+                <td>${day.day}</td>
+                <td>${day.breakfast}</td>
+                <td>${day.lunch}</td>
+                <td>${day.dinner}</td>
+            </tr>
         `).join('');
+
+        container.innerHTML = `
+            <div class="recommendation-header">
+                <h3>${plan.name} (สำหรับ BMI: ${bmiRecord.bmi.toFixed(2)})</h3>
+            </div>
+            <div class="food-plan-table-container">
+                <table class="food-plan-table">
+                    <thead>
+                        <tr>
+                            <th>วัน</th>
+                            <th>เช้า</th>
+                            <th>กลางวัน</th>
+                            <th>เย็น</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${tableRows}
+                    </tbody>
+                </table>
+            </div>
+        `;
     }
 
     // --- Tracking Record Page ---
