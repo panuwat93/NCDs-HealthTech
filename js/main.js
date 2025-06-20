@@ -576,40 +576,36 @@ document.addEventListener('DOMContentLoaded', () => {
         const newsContainer = document.getElementById('news-feed-container');
         if (!newsContainer) return;
 
-        // Switched to a more reliable proxy service
-        const RSS_URL = 'https://www.who.int/rss-feeds/news-rss.xml';
-        const API_URL = `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(RSS_URL)}`;
+        newsContainer.innerHTML = `<p class="loading-news">กำลังโหลดข่าวสารล่าสุด...</p>`;
+
+        const apiKey = 'e7952dfcea5a45ce99e6917535e9211f';
+        const url = `https://newsapi.org/v2/top-headlines?country=th&category=health&apiKey=${apiKey}`;
 
         try {
-            const response = await fetch(API_URL);
+            const response = await fetch(url);
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
             const data = await response.json();
-            
-            // Adapted for the new service's response format
-            if (data && data.status === 'ok' && data.items) {
-                const articles = data.items.slice(0, 5); // Get latest 5 articles
-                let articlesHtml = articles.map(article => {
-                    // Sanitize description and limit length
-                    const description = (article.description || '').replace(/<[^>]*>/g, "").substring(0, 120);
-                    return `
+
+            if (data.articles && data.articles.length > 0) {
+                const newsHtml = data.articles.slice(0, 5).map(article => `
                     <div class="news-article">
-                        <h4><a href="${article.link}" target="_blank" rel="noopener noreferrer">${article.title}</a></h4>
-                        <p class="news-description">${description}...</p>
+                        <h4><a href="${article.url}" target="_blank" rel="noopener noreferrer">${article.title}</a></h4>
+                        <p class="news-description">${article.description || 'ไม่มีคำอธิบาย'}</p>
                         <div class="news-footer">
-                            <span>${new Date(article.pubDate).toLocaleDateString('th-TH', { day: 'numeric', month: 'long', year: 'numeric' })}</span>
-                            <a href="${article.link}" target="_blank" rel="noopener noreferrer" class="read-more">อ่านต่อ <i class="fas fa-arrow-right"></i></a>
+                            <span>${article.source.name}</span>
+                            <span>${new Date(article.publishedAt).toLocaleDateString('th-TH')}</span>
                         </div>
                     </div>
-                `}).join('');
-                newsContainer.innerHTML = articlesHtml;
+                `).join('');
+                newsContainer.innerHTML = newsHtml;
             } else {
-                throw new Error('Could not fetch news from source. Invalid format.');
+                newsContainer.innerHTML = `<p>ไม่พบข่าวสารในขณะนี้</p>`;
             }
         } catch (error) {
-            console.error('Failed to fetch news:', error);
-            newsContainer.innerHTML = '<p>ขออภัย, ไม่สามารถโหลดข่าวสารได้ในขณะนี้</p>';
+            console.error("Could not fetch news:", error);
+            newsContainer.innerHTML = `<p>ขออภัย, ไม่สามารถโหลดข่าวสารได้ในขณะนี้ กรุณาลองใหม่อีกครั้ง</p>`;
         }
     }
 
