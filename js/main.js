@@ -269,15 +269,16 @@ document.addEventListener('DOMContentLoaded', () => {
     async function addBMIPageEventListeners() {
         const form = document.getElementById('bmi-form');
         const resultDiv = document.getElementById('bmi-result');
-        const submitBtn = document.getElementById('bmi-submit-btn');
-
+        
         const todayStr = new Date().toISOString().split('T')[0];
-        const lastRecord = await DBGet('bmiRecords', user.username);
-
-        if (lastRecord && lastRecord.date === todayStr) {
-            // Already calculated today
-            displayBMIResult(lastRecord.bmi, resultDiv);
-            form.style.display = 'none';
+        try {
+            const lastRecord = await DBGet('bmiRecords', user.username);
+            if (lastRecord && lastRecord.date === todayStr) {
+                displayBMIResult(lastRecord.bmi, resultDiv);
+                form.style.display = 'none';
+            }
+        } catch (error) {
+            console.log("No previous BMI record for today.");
         }
 
         form.addEventListener('submit', async (e) => {
@@ -316,7 +317,7 @@ document.addEventListener('DOMContentLoaded', () => {
         return { category: 'โรคอ้วนระดับที่ 2', advice: 'มีความเสี่ยงสูงต่อโรคต่างๆ ควรปรึกษาแพทย์เพื่อรับการดูแลอย่างใกล้ชิด', color: '#c0392b' };
     }
 
-    // --- Exercise Data ---
+    // --- Exercise Data & Page ---
     const exerciseData = [
         { id: 'ex01', name: 'เดินเร็ว', type: 'cardio', description: 'การเดินเร็วเป็นประจำช่วยเสริมสร้างความแข็งแรงของหัวใจและหลอดเลือด', details: 'เดินเร็ว 30-45 นาที 3-5 วันต่อสัปดาห์' },
         { id: 'ex02', name: 'โยคะ', type: 'flexibility', description: 'โยคะช่วยเพิ่มความยืดหยุ่นของร่างกาย ลดความเครียด และสร้างสมาธิ', details: 'ฝึกโยคะ 20-30 นาที 2-3 วันต่อสัปดาห์' },
@@ -324,26 +325,23 @@ document.addEventListener('DOMContentLoaded', () => {
         { id: 'ex04', name: 'ว่ายน้ำ', type: 'cardio', description: 'การว่ายน้ำเป็นการออกกำลังกายที่ดีเยี่ยม ได้บริหารทุกส่วนของร่างกายและมีแรงกระแทกต่ำ', details: 'ว่ายน้ำ 30 นาที 2-3 ครั้งต่อสัปดาห์' }
     ];
 
-    // --- Exercise Page ---
     function renderExercisePage() {
         return `
             <div class="page-header">
                 <h2><i class="fas fa-dumbbell"></i> แนะนำการออกกำลังกาย</h2>
                 <p>เลือกประเภทการออกกำลังกายที่คุณสนใจ</p>
             </div>
-            <div id="exercise-content"></div>
+            <div id="exercise-content-container"></div>
         `;
     }
 
-    async function addExercisePageEventListeners() {
-        const contentEl = document.getElementById('exercise-content');
-        const filterBtns = document.querySelectorAll('.exercise-filter-btn');
+    function addExercisePageEventListeners() {
+        const container = document.getElementById('exercise-content-container');
 
-        function renderList(filter = 'all') {
-            const filteredData = filter === 'all' ? exerciseData : exerciseData.filter(ex => ex.type === filter);
-            contentEl.innerHTML = `
+        function renderList() {
+            container.innerHTML = `
                 <div class="exercise-list">
-                    ${filteredData.map(ex => `
+                    ${exerciseData.map(ex => `
                         <div class="exercise-card" data-id="${ex.id}">
                             <h4>${ex.name}</h4>
                             <p>${ex.description}</p>
@@ -360,7 +358,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         function renderExerciseDetail(exercise) {
-            contentEl.innerHTML = `
+            container.innerHTML = `
                 <div class="exercise-detail">
                     <button id="back-to-list" class="btn-back"><i class="fas fa-arrow-left"></i> กลับไปรายการ</button>
                     <h3>${exercise.name}</h3>
@@ -369,21 +367,13 @@ document.addEventListener('DOMContentLoaded', () => {
                     <p><strong>รายละเอียดเพิ่มเติม:</strong> ${exercise.details}</p>
                 </div>
             `;
-            document.getElementById('back-to-list').addEventListener('click', () => renderList());
+            document.getElementById('back-to-list').addEventListener('click', renderList);
         }
         
-        filterBtns.forEach(btn => {
-            btn.addEventListener('click', () => {
-                filterBtns.forEach(b => b.classList.remove('active'));
-                btn.classList.add('active');
-                renderList(btn.dataset.filter);
-            });
-        });
-
         renderList();
     }
     
-    // --- Food Data ---
+    // --- Food Data & Page ---
     const foodData = [
         { id: 'f01', name: 'ข้าวกล้อง', group: 'carbs', benefit: 'มีใยอาหารสูง ช่วยควบคุมระดับน้ำตาลในเลือดได้ดีกว่าข้าวขาว' },
         { id: 'f02', name: 'ปลาแซลมอน', group: 'protein', benefit: 'เป็นแหล่งของโปรตีนและกรดไขมันโอเมก้า 3 ที่ดีต่อสุขภาพหัวใจ' },
@@ -392,7 +382,6 @@ document.addEventListener('DOMContentLoaded', () => {
         { id: 'f05', name: 'อกไก่', group: 'protein', benefit: 'โปรตีนสูง ไขมันต่ำ เหมาะสำหรับสร้างกล้ามเนื้อและควบคุมน้ำหนัก' }
     ];
 
-    // --- Food Page ---
     function renderFoodPage() {
         return `
             <div class="page-header">
@@ -402,7 +391,7 @@ document.addEventListener('DOMContentLoaded', () => {
         `;
     }
 
-    async function addFoodPageEventListeners() {
+    function addFoodPageEventListeners() {
         const container = document.getElementById('food-list-container');
         if (!container) return;
         
@@ -612,29 +601,23 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!newsContainer) return;
 
         const rssUrl = 'https://www.who.int/rss-feeds/news-english.xml';
-        // Using a more robust proxy: cors.sh
-        const proxyUrl = `https://cors.sh/${rssUrl}`;
+        const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(rssUrl)}`;
         
         try {
-            const response = await fetch(proxyUrl, {
-                headers: {
-                    // cors.sh might require an origin header to be present
-                    'x-origin': window.location.origin 
-                }
-            });
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-            const str = await response.text();
+            const response = await fetch(proxyUrl);
+            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+            
+            const data = await response.json();
+            const str = data.contents;
             const xml = new window.DOMParser().parseFromString(str, "text/xml");
             const items = xml.querySelectorAll("item");
             
             let html = ``;
             items.forEach((el, index) => {
                 if (index >= 5) return; // Limit to 5 news items
-                const title = el.querySelector("title").textContent;
-                const link = el.querySelector("link").textContent;
-                const pubDate = new Date(el.querySelector("pubDate").textContent).toLocaleDateString('th-TH');
+                const title = el.querySelector("title")?.textContent || 'No title';
+                const link = el.querySelector("link")?.textContent || '#';
+                const pubDate = new Date(el.querySelector("pubDate")?.textContent).toLocaleDateString('th-TH');
                 
                 html += `
                     <div class="news-item">
@@ -654,7 +637,7 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (error) {
             console.error("Error fetching WHO news feed:", error);
             if (newsContainer) {
-                newsContainer.innerHTML = `<p>ขออภัย, ไม่สามารถโหลดข่าวสารได้ในขณะนี้ กรุณาลองใหม่ในภายหลัง</p>`;
+                newsContainer.innerHTML = `<p>ขออภัย, ไม่สามารถโหลดข่าวสารได้ในขณะนี้ (อาจเกิดจากปัญหา CORS Proxy) ลองรีเฟรชหน้าเว็บอีกครั้ง</p>`;
             }
         }
     }
@@ -663,7 +646,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const DB_NAME = 'NCDsHealthTechDB';
     function openDB() {
         return new Promise((resolve, reject) => {
-            const request = indexedDB.open(DB_NAME, 2); // Version 2 for BMI table
+            const request = indexedDB.open(DB_NAME, 2); 
             request.onerror = (event) => reject('Database error: ' + event.target.errorCode);
             request.onupgradeneeded = (event) => {
                 const db = event.target.result;
@@ -676,7 +659,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (!db.objectStoreNames.contains('trackingRecords')) {
                     db.createObjectStore('trackingRecords', { keyPath: 'id', autoIncrement: true });
                 }
-                if (!db.objectStoreNames.contains('bmiRecords')) { // New table for BMI
+                if (!db.objectStoreNames.contains('bmiRecords')) { 
                     db.createObjectStore('bmiRecords', { keyPath: 'username' });
                 }
             };
